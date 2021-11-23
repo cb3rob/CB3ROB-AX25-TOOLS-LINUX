@@ -4,12 +4,11 @@
 //Republic CyberBunker
 
 //COMPILE WITH gcc -O3 -o cb3rob-kiss-tcp-attach cb3rob-kiss-tcp-attach.c -lutil
-//openpty() requires -lutil
+//openpty() REQUIRES -lutil
 
 //TO BRING UP AN AX.25 KISS INTERFACE (ax0,ax1,etc) TO A KISS TNC OR KISS CONCENTRATOR SERVER:
 
-//cb3rob-kiss-tcp-attach NOCALL 208.109.9.123 8001 &
-
+// ./cb3rob-kiss-tcp-attach NOCALL 208.109.9.123 8001 &
 
 #include<arpa/inet.h>
 #include<fcntl.h>
@@ -62,11 +61,10 @@ snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,(
 return(rcbt);
 };//SRCBTIME
 
-//QUICK AND DIRTY. CLEAN THIS UP A BIT LATER.
 int calltobin(char *ascii,ax25_address *bin){
+int n;
 if(ascii==NULL)return(-1);
 if(bin==NULL)return(-1);
-int n;
 for(n=0;n<6;n++)bin->ax25_call[n]=0x40;
 for(n=0;(n<6)&&(((ascii[n]>=0x30)&&(ascii[n]<=0x39))||(((ascii[n]&0xDF)>=0x41)&&((ascii[n]&0xDF)<=0x5A)));n++){
 if((ascii[n]>=0x30)&&(ascii[n]<=0x39))bin->ax25_call[n]=ascii[n]<<1;
@@ -75,7 +73,6 @@ if(((ascii[n]&0xDF)>=0x41)&&((ascii[n]&0xDF)<=0x5A))bin->ax25_call[n]=(ascii[n]&
 if(n<1)return(-1);
 if(ascii[n]==0){bin->ax25_call[6]=0;return(n);};
 if(ascii[n]!=0x2D)return(-1);
-//EXTRA IF INSTEAD OF &&... GUARANTEES NOT OVERRUNNING THE VARIABLE BY PROCESSING ORDER
 if((ascii[n+1]>=0x30)&&(ascii[n+1]<=0x39))if(ascii[n+2]==0){bin->ax25_call[6]=(ascii[n+1]-0x30)<<1;return(6);};
 if(ascii[n+1]==0x31)if((ascii[n+2]>=0x30)&&(ascii[n+2]<=0x35))if(ascii[n+3]==0){bin->ax25_call[6]=(10+(ascii[n+2]-0x30))<<1;return(6);};
 return(-1);
@@ -105,9 +102,9 @@ printf("%s CONNECTED: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr
 };//TCPCONNECT
 
 int main(int argc,char **argv){
-if(argc<4){printf("USAGE: %s <CALLSIGN[-SSID]> <KISS-TCP-SERVER-OR-TNC> <PORT>\n",argv[0]);exit(0);};
+if(argc<4){printf("USAGE: %s <CALLSIGN[-SSID]> <KISS-TCP-SERVER-OR-TNC> <PORT>\n",argv[0]);exit(EXIT_FAILURE);};
 
-if(calltobin(argv[1],&call)<1){printf("INVALID DEVICE CALLSIGN: %s\n",argv[1]);exit(0);};
+if(calltobin(argv[1],&call)<1){printf("INVALID DEVICE CALLSIGN: %s\n",argv[1]);exit(EXIT_FAILURE);};
 
 //CREATE PSEUDO TTY
 bzero(&trm,sizeof(struct termios));
@@ -169,7 +166,7 @@ bytes=recv(sock,&pbfr,sizeof(pbfr),MSG_DONTWAIT);
 if(bytes==0){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);tcpconnect(argv[2],argv[3]);};
 if(bytes>0){
 printf("%s SOCKET READ: %ld BYTES: ",srcbtime(0),bytes);for(n=0;n<bytes;n++)printf(" %02X",pbfr[n]);printf("\n");
-write(master,&pbfr,bytes);
+if(write(master,&pbfr,bytes)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
 };//BYTES>0
 };//FDSET
 

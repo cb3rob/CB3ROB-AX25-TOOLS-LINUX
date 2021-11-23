@@ -100,8 +100,8 @@ if(bind(sockfd,(struct sockaddr*)&saddr,sizeof(saddr))!=0){printf("%s SOCKET BIN
 if(listen(sockfd,1024)!=0){printf("%s SOCKET LISTEN FAILED\n",srcbtime(0));close(sockfd);sleep(1);continue;};
 printf("%s SOCKET LISTEN SUCCESS\n",srcbtime(0));
 break;
-};
-};//setuplistener
+};//WHILE 1
+};//SETUPLISTENER
 
 int main(){
 setuplistener();

@@ -18,7 +18,6 @@
 int bsock;
 int csock;
 char tbuf[257];
-//ALL LINUX AX.25 FUNCTIONS REQUIRE A FULL SOCKADDR OR THE STACK GETS CONFUSED WITH 'HALF OPEN SOCKETS' WORKING JUST ONCE OR TWICE PER ADDRESS PAIR.
 struct full_sockaddr_ax25 baddr;
 struct full_sockaddr_ax25 caddr;
 socklen_t clen;
@@ -40,15 +39,6 @@ return(rcbt);
 };//SRCBTIME
 
 int addresstoascii(ax25_address *bin,char *a){
-//2021-11-14 HRH PRINCE SVEN OLAF OF CYBERBUNKER-KAMPHUIS
-//PARAMETERS
-//ax25_address *b[6] - BINARY ADDRESS FIELD IN AX.25 PACKET
-//char *a[10] - ZERO TERMINATED ASCII CALL-SSID
-//RETURNS VALUES:
-//0: INVALID
-//1: VALID, MORE FOLLOW
-//2: VALID, LAST
-//unsigned char a[9];
 unsigned char ssid;
 unsigned char control;
 unsigned int n;
@@ -124,7 +114,7 @@ thisblock=AX25_MTU;flags=0;if((total-sent)<=AX25_MTU){thisblock=(total-sent);fla
 printf("CHILD %d SENDING: %ld SENT: %ld TOTAL: %ld\n",getpid(),thisblock,sent,total);
 bytes=send(csock,(uint8_t*)data+sent,thisblock,flags);
 printf("CHILD %d SENT: %ld\n",getpid(),bytes);
-if(bytes==-1){printf("CHILD %d DISCONNECTED UPON SEND\n",getpid());close(csock);exit(0);};
+if(bytes==-1){printf("CHILD %d DISCONNECTED UPON SEND\n",getpid());close(csock);exit(EXIT_FAILURE);};
 sent+=bytes;
 };//WHILE DATA REMAINING
 };//SENDCLIENT
@@ -137,7 +127,7 @@ if(bsock==-1)continue;
 printf("MAIN SOCKET: %d\n",bsock);
 bzero(&baddr,sizeof(struct full_sockaddr_ax25));
 baddr.fsa_ax25.sax25_family=AF_AX25;
-if(calltobin(callsign,&baddr.fsa_ax25.sax25_call)==-1){printf("INVALID CALLSIGN: %s!\n",callsign);exit(0);};
+if(calltobin(callsign,&baddr.fsa_ax25.sax25_call)==-1){printf("INVALID CALLSIGN: %s!\n",callsign);exit(EXIT_FAILURE);};
 baddr.fsa_ax25.sax25_ndigis=0;
 if(bind(bsock,(struct sockaddr*)&baddr,sizeof(struct full_sockaddr_ax25))==-1){printf("BIND FAILED!\n");sleep(1);continue;};
 if(listen(bsock,0)==-1){printf("LISTEN FAILED\n");sleep(1);continue;};
@@ -171,11 +161,11 @@ close(csock);
 //printf("RECEIVING: %d:\n",recv(csock,tbuf,sizeof(tbuf),0));
 //recv(csock,&tbuf,sizeof(tbuf)-1,0);
 //printf("RECEIVED: %s\n",tbuf);
-exit(0);
+exit(EXIT_SUCCESS);
 };//CLIENTCODE
 
 int main(int argc,char **argv){
-if(argc<2){printf("USAGE: %s <INTERFACE-CALLSIGN-SSID>\n",argv[0]);exit(0);};
+if(argc<2){printf("USAGE: %s <INTERFACE-CALLSIGN-SSID>\n",argv[0]);exit(EXIT_FAILURE);};
 bsock=-1;setupsock(argv[1]);
 
 while(1){
