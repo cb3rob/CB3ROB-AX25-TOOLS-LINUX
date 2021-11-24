@@ -3,6 +3,14 @@
 //One CyberBunker Avenue
 //Republic CyberBunker
 
+//DEFAULT KISS-TCP PORTS:
+
+// Fldigi   7342
+// AGWPE    8001
+// CB3ROB   8001
+// Direwolf 8001
+// UZ7HO    8100
+
 //COMPILE WITH gcc -O3 -o cb3rob-kiss-tcp-attach cb3rob-kiss-tcp-attach.c -lutil
 //openpty() REQUIRES -lutil
 

@@ -3,8 +3,13 @@
 //One CyberBunker Avenue
 //Republic CyberBunker
 
-//8001	default KISS port for AGWPE and DireWolf
-//7342	default TCP KISS port for Fldigi
+//DEFAULT KISS-TCP PORTS:
+
+// Fldigi   7342
+// AGWPE    8001
+// CB3ROB   8001
+// Direwolf 8001
+// UZ7HO    8100
 
 #include<arpa/inet.h>
 #include<fcntl.h>
