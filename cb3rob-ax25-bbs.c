@@ -27,6 +27,8 @@ struct timeval tv;
 
 char sourcecall[10];
 char destcall[10];
+char servicecall[10];
+char interfacecall[10];
 
 char *srcbtime(time_t t){
 static char rcbt[22];
@@ -119,7 +121,7 @@ sent+=bytes;
 };//WHILE DATA REMAINING
 };//SENDCLIENT
 
-void setupsock(char *callsign){
+void setupsock(char *service,char*interface){
 while(1){
 if(bsock!=-1)close(bsock);
 bsock=socket(PF_AX25,SOCK_SEQPACKET|SOCK_NONBLOCK,0);
@@ -127,12 +129,19 @@ if(bsock==-1)continue;
 printf("MAIN SOCKET: %d\n",bsock);
 bzero(&baddr,sizeof(struct full_sockaddr_ax25));
 baddr.fsa_ax25.sax25_family=AF_AX25;
-if(calltobin(callsign,&baddr.fsa_ax25.sax25_call)==-1){printf("INVALID CALLSIGN: %s!\n",callsign);exit(EXIT_FAILURE);};
-baddr.fsa_ax25.sax25_ndigis=0;
-if(bind(bsock,(struct sockaddr*)&baddr,sizeof(struct full_sockaddr_ax25))==-1){printf("BIND FAILED!\n");sleep(1);continue;};
+if(calltobin(service,&baddr.fsa_ax25.sax25_call)==-1){printf("INVALID SERVICE-CALLSIGN: %s!\n",service);exit(EXIT_FAILURE);};
+//argv[argc] IS GUARANTEED TO BE NULL. NO OVERFLOW POSSIBLE
+if(interface!=NULL){//USER SPECIFIED AN INTERFACE TO BIND TO
+baddr.fsa_ax25.sax25_ndigis=1;
+if(calltobin(interface,&baddr.fsa_digipeater[0])==-1){printf("INVALID INTERFACE-CALLSIGN: %s!\n",interface);exit(EXIT_FAILURE);};
+addresstoascii(&baddr.fsa_digipeater[0],interfacecall);
+};
+if(bind(bsock,(struct sockaddr*)&baddr,sizeof(struct full_sockaddr_ax25))==-1){printf("BIND FAILED! - IS THERE AN INTERFACE WITH THAT CALLSIGN?\n");sleep(1);continue;};
 if(listen(bsock,0)==-1){printf("LISTEN FAILED\n");sleep(1);continue;};
 addresstoascii(&baddr.fsa_ax25.sax25_call,destcall);
-printf("BOUND TO: %s\n",destcall);
+printf("BOUND TO: %s",destcall);
+if(baddr.fsa_ax25.sax25_ndigis==1)printf(" ON INTERFACE: %s",interfacecall);
+printf("\n");
 break;
 };//WHILE NOT SOCKET LOOP
 };//SETUPSOCK
@@ -165,8 +174,9 @@ exit(EXIT_SUCCESS);
 };//CLIENTCODE
 
 int main(int argc,char **argv){
-if(argc<2){printf("USAGE: %s <INTERFACE-CALLSIGN-SSID>\n",argv[0]);exit(EXIT_FAILURE);};
-bsock=-1;setupsock(argv[1]);
+if(argc<2){printf("USAGE: %s <SERVICE-CALLSIGN-SSID> [INTERFACE-CALLSIGN]\n\nIF THE PROCESS IS TO LISTEN ON A (VIRTUAL) CALLSIGN OTHER THAN ONE OF AN INTERFACE SPECIFY THE INTERFACE AS WELL\n",argv[0]);exit(EXIT_FAILURE);};
+
+bsock=-1;setupsock(argv[1],argv[2]);
 
 while(1){
 FD_ZERO(&readfds);//BSOCK CHANGES IF INTERFACE CHANGES
@@ -178,7 +188,7 @@ select(bsock+1,&readfds,NULL,NULL,&tv);
 if(FD_ISSET(bsock,&readfds)){
 clen=sizeof(struct full_sockaddr_ax25);
 csock=accept(bsock,(struct sockaddr*)&caddr,&clen);
-if(csock==-1)setupsock(argv[1]);
+if(csock==-1)setupsock(argv[1],argv[2]);
 if(csock!=-1){if(fork()==0){close(bsock);clientcode();}else{close(csock);};};//FORK CHILD AND CLOSE CLIENTSOCK IN PARENT
 };//CLIENT IN QUEUE
 };//WHILE 1 ACCEPT
