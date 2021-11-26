@@ -27,10 +27,10 @@
 #include<termios.h>
 #include<pty.h>
 #include<wait.h>
+#include<signal.h>
 
 int bsock;
 int csock;
-int master;
 char tbuf[257];
 struct full_sockaddr_ax25 baddr;
 struct full_sockaddr_ax25 caddr;
@@ -111,7 +111,7 @@ if(ascii[n+1]==0x31)if((ascii[n+2]>=0x30)&&(ascii[n+2]<=0x35))if(ascii[n+3]==0){
 return(-1);
 };//CALLTOBIN
 
-void sendclient(void *data,ssize_t total){
+ssize_t sendclient(void *data,ssize_t total){
 ssize_t bytes;
 ssize_t thisblock;
 ssize_t sent;
@@ -128,13 +128,15 @@ tv.tv_usec=0;
 printf("%s CLIENT %d WAIT FOR SELECT\n",srcbtime(0),getpid());
 select(csock+1,NULL,&writefds,NULL,&tv);
 //FALL THROUGH IS SEND ANYWAY TO CHECK IF STILL CONNECTED
-thisblock=AX25_MTU;flags=0;if((total-sent)<=AX25_MTU){thisblock=(total-sent);flags=MSG_EOR;};
+thisblock=AX25_MTU;flags=MSG_DONTWAIT;if((total-sent)<=AX25_MTU){thisblock=(total-sent);flags|=MSG_EOR;};
 printf("%s CLIENT %d SENDING: %ld SENT: %ld TOTAL: %ld\n",srcbtime(0),getpid(),thisblock,sent,total);
+fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK);
 bytes=send(csock,(uint8_t*)data+sent,thisblock,flags);
 printf("%s CLIENT %d SENT: %ld\n",srcbtime(0),getpid(),bytes);
-if(bytes==-1){printf("%s CLIENT %d DISCONNECTED UPON SEND\n",srcbtime(0),getpid());close(csock);exit(EXIT_FAILURE);};
+if(bytes<1)break;
 sent+=bytes;
 };//WHILE DATA REMAINING
+return(bytes);
 };//SENDCLIENT
 
 void setupsock(char *service,char*interface){
@@ -162,32 +164,45 @@ break;
 };//WHILE NOT SOCKET LOOP
 };//SETUPSOCK
 
+void termclient(int csock,int master,pid_t ptychild){
+printf("%s CLIENT %d TERMINATING\n",srcbtime(0),getpid());
+bzero(&tbuf,sizeof(tbuf));
+if(csock!=-1){printf("%s CLIENT %d CLOSING SOCKET %d\n",srcbtime(0),getpid(),csock);close(csock);csock=-1;};
+if(master!=-1){printf("%s CLIENT %d CLOSING MASTER %d\n",srcbtime(0),getpid(),master);close(master);master=-1;};
+if(ptychild!=-1){printf("%s CLIENT %d KILLING LOGIN %d\n",srcbtime(0),getpid(),ptychild);kill(ptychild,SIGTERM);sleep(10);kill(ptychild,SIGKILL);ptychild=-1;};
+printf("%s CLIENT %d TERMINATED\n",srcbtime(0),getpid());
+exit(EXIT_SUCCESS);
+};//TERMCLIENT
+
 int clientcode(){
-ssize_t bytes;
-pid_t ptychild;
-int n;
-fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK);
 //FORK CHILD
-printf("CONNECTED\n");
-printf("CLIENT SOCKET: %d\n",csock);
+ssize_t bytes;
+pid_t ptychild;ptychild=-1;
+int master;master=-1;
+int n;
+void calltermclient(){printf("%s CLIENT %d SIGPIPE/SIGTERM TRIGGERED\n",srcbtime(0),getpid());termclient(csock,master,ptychild);};
+signal(SIGPIPE,calltermclient);
+signal(SIGTERM,calltermclient);
+fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK);
+printf("%s CLIENT %d CONNECTED\n",srcbtime(0),getpid());
+printf("%s CLIENT %d SOCKET: %d\n",srcbtime(0),getpid(),csock);
 bzero(&tbuf,sizeof(tbuf));
 addresstoascii(&caddr.fsa_ax25.sax25_call,sourcecall);
 snprintf(tbuf,sizeof(tbuf)-1,"%s %s -> %s\r\r",srcbtime(0),sourcecall,destcall);
-sendclient(tbuf,0);
+if(sendclient(tbuf,0)<0)termclient(csock,master,ptychild);
 bzero(&tbuf,sizeof(tbuf));
 bzero(&trm,sizeof(trm));
 cfmakeraw(&trm);
 ptychild=forkpty(&master,NULL,&trm,NULL);
 if(ptychild==0){
-close(csock);//DON'T WANT THAT HERE
+//CHILD (LOGIN)
+close(csock);csock=-1;//DON'T WANT THAT HERE
 execlp("/bin/login","/bin/login",NULL);
 exit(EXIT_SUCCESS);
-}else{//CHILD
-
+}else{
+//PARENT (DATA RELAY)
 if(fcntl(master,F_SETFL,O_NONBLOCK)==-1)exit(EXIT_FAILURE);
-
 FD_ZERO(&readfds);
-
 while(waitpid(ptychild,NULL,WNOHANG)!=ptychild){
 FD_SET(master,&readfds);
 FD_SET(csock,&readfds);
@@ -200,27 +215,31 @@ select(nfds+1,&readfds,NULL,NULL,&tv);
 if(FD_ISSET(master,&readfds)){
 //STICK TO MTU SIZE - TBUF IS ONE LONGER FOR TRAILING ZERO ON STRINGS INTERNALLY
 bytes=read(master,&tbuf,AX25_MTU);
+if(bytes<1)termclient(csock,master,ptychild);
 if(bytes>0){
 printf("%s CLIENT %d READ %ld BYTES FROM LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
 //HAVE TERMIOS DO THIS
 for(n=0;n<bytes;n++)if(tbuf[n]==0x0A)tbuf[n]=0x0D;
-sendclient(&tbuf,bytes);
+if(sendclient(&tbuf,bytes)<1)termclient(csock,master,ptychild);
 };//RECEIVED BYTES FROM PROGRAM
 };//FD SET
 
 //BYTES TO PROGRAM
 if(FD_ISSET(csock,&readfds)){
 bytes=recv(csock,&tbuf,sizeof(tbuf),0);
+if(bytes<1)termclient(csock,master,ptychild);
 if(bytes>0){
 printf("%s CLIENT %d SENT %ld BYTES TO LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
 //HAVE TERMIOS DO THIS
 for(n=0;n<bytes;n++)if(tbuf[n]==0x0D)tbuf[n]=0x0A;
-if(write(master,&tbuf,bytes)<1)exit(EXIT_FAILURE);
+if(write(master,&tbuf,bytes)<1)termclient(csock,master,ptychild);
 };//SENT BYTES TO PROGRAM
 };//FD SET
 };//WHILE CHILD RUNNING
-printf("%s CLIENT %d LOGIN %d TERMINATED\n",srcbtime(0),getpid(),ptychild);
+ptychild=-1;
+
 };//PARENT
+
 printf("%s CLIENT %d WAIT FOR SOCKET %d CLOSE\n",srcbtime(0),getpid(),csock);
 //WAIT AT MOST 60 SECONDS FOR CLIENT TO CLOSE SOCKET OR CLOSE SOCKET OURSELVES.
 FD_ZERO(&readfds);
@@ -230,12 +249,9 @@ tv.tv_usec=0;
 while((tv.tv_sec>0)||(tv.tv_usec>0)){
 FD_SET(csock,&readfds);
 select(csock+1,&readfds,NULL,NULL,&tv);
-if(recv(csock,&tbuf,sizeof(tbuf),0)<1)break;//CHECK IF OTHER END DIDN'T DISCONNECT FIRST
-printf("%d WAITFORCLIENTCLOSE\n",getpid());
+if(recv(csock,&tbuf,sizeof(tbuf),0)<1)break;
 };//WAITCLIENTCLOSE
-bzero(&tbuf,sizeof(tbuf));
-close(csock);
-printf("%s CLIENT %d TERMINATED\n",srcbtime(0),getpid());
+termclient(csock,master,ptychild);
 exit(EXIT_SUCCESS);
 };//CLIENTCODE
 
