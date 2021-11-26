@@ -209,7 +209,7 @@ if(bytes>0){
 printf("CHILD SENT %ld BYTES TO LOGIN\n",bytes);
 //HAVE TERMIOS DO THIS
 for(n=0;n<bytes;n++)if(tbuf[n]==0x0D)tbuf[n]=0x0A;
-write(master,&tbuf,bytes);
+if(write(master,&tbuf,bytes)<1)exit(EXIT_FAILURE);
 };//SENT BYTES TO PROGRAM
 };//FD SET
 
