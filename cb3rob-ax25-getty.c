@@ -201,7 +201,7 @@ if(FD_ISSET(master,&readfds)){
 //STICK TO MTU SIZE - TBUF IS ONE LONGER FOR TRAILING ZERO ON STRINGS INTERNALLY
 bytes=read(master,&tbuf,AX25_MTU);
 if(bytes>0){
-printf("CHILD %d READ %ld BYTES FROM LOGIN %d\n",getpid(),bytes,ptychild);
+printf("%s CHILD %d READ %ld BYTES FROM LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
 //HAVE TERMIOS DO THIS
 for(n=0;n<bytes;n++)if(tbuf[n]==0x0A)tbuf[n]=0x0D;
 sendclient(&tbuf,bytes);
@@ -212,19 +212,29 @@ sendclient(&tbuf,bytes);
 if(FD_ISSET(csock,&readfds)){
 bytes=recv(csock,&tbuf,sizeof(tbuf),0);
 if(bytes>0){
-printf("CHILD %d SENT %ld BYTES TO LOGIN %d\n",getpid(),bytes,ptychild);
+printf("%s CHILD %d SENT %ld BYTES TO LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
 //HAVE TERMIOS DO THIS
 for(n=0;n<bytes;n++)if(tbuf[n]==0x0D)tbuf[n]=0x0A;
 if(write(master,&tbuf,bytes)<1)exit(EXIT_FAILURE);
 };//SENT BYTES TO PROGRAM
 };//FD SET
 };//WHILE CHILD RUNNING
-printf("child %d LOGIN %d TERMINATED\n",getpid(),ptychild);
+printf("%s CHILD %d LOGIN %d TERMINATED\n",srcbtime(0),getpid(),ptychild);
 };//PARENT
-printf("CHILD %d WAIT FOR SOCKET %d CLOSE\n",getpid(),csock);
-sleep(60);
+printf("%s CHILD %d WAIT FOR SOCKET %d CLOSE\n",srcbtime(0),getpid(),csock);
+FD_ZERO(&readfds);
+//WAIT AT MOST 60 SECONDS FOR CLIENT TO CLOSE SOCKET OR CLOSE SOCKET OURSELVES.
+tv.tv_sec=60;
+tv.tv_usec=0;
+//THIS BIT IS KINDA PROBLEMATIC AS CLOSING A SOCKET BEFORE ALL DATA IS FULLY PROCESSED ON THE OTHER SIDE LEADS TO REMAINING DATA GETTING LOST
+while((tv.tv_sec>0)||(tv.tv_usec>0)){
+FD_SET(csock,&readfds);
+select(csock+1,&readfds,NULL,NULL,&tv);
+if(recv(csock,&tbuf,sizeof(tbuf),0)<1)break;//CHECK IF OTHER END DIDN'T DISCONNECT FIRST
+};//WAITCLIENTCLOSE
+bzero(&tbuf,sizeof(tbuf));
 close(csock);
-printf("CHILD %d TERMINATING\n",getpid());
+printf("%s CHILD %d TERMINATED\n",srcbtime(0),getpid());
 exit(EXIT_SUCCESS);
 };//CLIENTCODE
 
@@ -238,7 +248,7 @@ FD_ZERO(&readfds);//BSOCK CHANGES IF INTERFACE CHANGES
 FD_SET(bsock,&readfds);
 tv.tv_sec=600;
 tv.tv_usec=0;
-printf("WAIT FOR CLIENT\n");
+printf("%s WAIT FOR CLIENT\n",srcbtime(0));
 select(bsock+1,&readfds,NULL,NULL,&tv);
 if(FD_ISSET(bsock,&readfds)){
 clen=sizeof(struct full_sockaddr_ax25);
