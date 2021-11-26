@@ -31,6 +31,7 @@
 #include<linux/if_packet.h>
 #include<linux/if_ether.h>
 #include<net/if.h>
+#include<net/if_arp.h>
 #include<sys/ioctl.h>
 #include<sys/socket.h>
 #include<sys/types.h>
@@ -45,8 +46,8 @@
 #define AXALEN 7
 #define PACKET_SIZE 1500
 
-struct sockaddr_pkt ssockaddrpkt;
-struct sockaddr_pkt dsockaddrpkt;
+struct sockaddr_ll ssockaddrll;
+struct sockaddr_ll dsockaddrll;
 
 int portcount;
 int needreload;
@@ -80,7 +81,7 @@ portcount=0;
 int socktemp;
 struct ifaddrs *ifaddr, *ifa;
 struct ifreq ifr;
-if((socktemp=socket(PF_PACKET,SOCK_PACKET,htons(ETH_P_AX25)))==-1){perror("SOCKET - THIS PROGRAM MUST BE RUN AS ROOT");exit(EXIT_FAILURE);};
+if((socktemp=socket(PF_PACKET,SOCK_RAW,htons(ETH_P_AX25)))==-1){perror("SOCKET - THIS PROGRAM MUST BE RUN AS ROOT");exit(EXIT_FAILURE);};
 bzero(&myinterfaces,sizeof(myinterfaces));
 printf("SCANNING AX.25 INTERFACES\n");
 //GETIFADDRS WORKS WITHOUT IP
@@ -118,7 +119,7 @@ ssize_t bytes;
 int po;
 uint8_t *pctr;
 uint8_t buf[PACKET_SIZE];
-if((sock=socket(PF_PACKET,SOCK_PACKET,htons(ETH_P_AX25)))==-1){perror("SOCKET - THIS PROGRAM MUST BE RUN AS ROOT");exit(EXIT_FAILURE);};
+if((sock=socket(PF_PACKET,SOCK_RAW,htons(ETH_P_AX25)))==-1){perror("SOCKET - THIS PROGRAM MUST BE RUN AS ROOT");exit(EXIT_FAILURE);};
 
 //THIS DOESN'T WORK WITH THE CURRENT VERSION OF THE KERNEL.
 //THEREFORE PACKETS ORIGINATING FROM TERMINAL SOFTWARE RUNNING ON THE MACHINE THAT RUNS THE BRIDGE NEVER GET BRIDGED.
@@ -137,38 +138,41 @@ while(needreload==1)getinterfaces();
 if(portcount<2)needreload=1;
 
 bzero(&buf,sizeof(buf));
-bzero(&ssockaddrpkt,sizeof(struct sockaddr_pkt));
+bzero(&ssockaddrll,sizeof(struct sockaddr_ll));
 
-clen=sizeof(struct sockaddr_pkt);
-bytes=recvfrom(sock,&buf,sizeof(buf),0,(struct sockaddr*)&ssockaddrpkt,&clen);
+clen=sizeof(struct sockaddr_ll);
+bytes=recvfrom(sock,&buf,sizeof(buf),0,(struct sockaddr*)&ssockaddrll,&clen);
 //DEBUG PACKET
 if(bytes<16)continue;
 pctr=buf;
 //KISS byte
 if(pctr[0]!=0)continue;
 pctr++;
-if(ssockaddrpkt.spkt_protocol!=htons(ETH_P_AX25))continue;
-if(ssockaddrpkt.spkt_family!=PF_AX25)continue;
+if(ssockaddrll.sll_protocol!=htons(ETH_P_AX25))continue;
+if(ssockaddrll.sll_family!=AF_PACKET)continue;
+if(ssockaddrll.sll_hatype!=ARPHRD_AX25)continue;
 
 printf("============================================\n");
-printf("INPUT DEVICE: %s FAMILY: %04X PROTOCOL: %04X TO: %s ",ssockaddrpkt.spkt_device,ssockaddrpkt.spkt_family,ntohs(ssockaddrpkt.spkt_protocol),displaycall(pctr));
+printf("INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",ssockaddrll.sll_ifindex,ssockaddrll.sll_family,ntohs(ssockaddrll.sll_protocol),displaycall(pctr));
 pctr+=AXALEN;
 //SRC ADDR
 printf("FROM: %s SIZE: %ld\n",displaycall(pctr),bytes);
 
 for(po=0;po<portcount;po++){
 //NOT BRIDGING TO SOURCE INTERFACE
-if(strncmp(myinterfaces[po].ifname,(char*)ssockaddrpkt.spkt_device,sizeof(ssockaddrpkt.spkt_device))==0)continue;
+if(myinterfaces[po].ifindex==ssockaddrll.sll_ifindex)continue;
 //NOT BRIDGING TO INTERFACES THAT ARE NOT UP
 if(!(myinterfaces[po].status&(IFF_UP|IFF_RUNNING))){needreload=1;continue;};
 //ALL FINE, FORWARD PACKET
 printf("FORWARDING PACKET OVER INTERFACE %s (%d) TO %s\n",myinterfaces[po].ifname,myinterfaces[po].ifindex,displaycall(buf+1));
-bzero(&dsockaddrpkt,sizeof(struct sockaddr_pkt));
-dsockaddrpkt.spkt_family=ssockaddrpkt.spkt_family;
-strncpy((char*)dsockaddrpkt.spkt_device,myinterfaces[po].ifname,sizeof(ssockaddrpkt.spkt_device));
-dsockaddrpkt.spkt_protocol=ssockaddrpkt.spkt_protocol;
-clen=sizeof(struct sockaddr_pkt);
-if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrpkt,clen)==-1){perror("sendto");needreload=1;continue;};
+bzero(&dsockaddrll,sizeof(struct sockaddr_ll));
+dsockaddrll.sll_family=ssockaddrll.sll_family;
+dsockaddrll.sll_ifindex=myinterfaces[po].ifindex;
+dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
+dsockaddrll.sll_hatype=ssockaddrll.sll_hatype;
+
+clen=sizeof(struct sockaddr_ll);
+if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,clen)==-1){perror("sendto");needreload=1;continue;};
 };//FOR FORWARD PACKET TO EACH INTERFACE THAT WAS UP AT PROGRAM START IT DID NOT ORIGINATE FROM
 
 };//WHILE 1
