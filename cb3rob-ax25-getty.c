@@ -231,6 +231,7 @@ while((tv.tv_sec>0)||(tv.tv_usec>0)){
 FD_SET(csock,&readfds);
 select(csock+1,&readfds,NULL,NULL,&tv);
 if(recv(csock,&tbuf,sizeof(tbuf),0)<1)break;//CHECK IF OTHER END DIDN'T DISCONNECT FIRST
+printf("%d WAITFORCLIENTCLOSE\n",getpid());
 };//WAITCLIENTCLOSE
 bzero(&tbuf,sizeof(tbuf));
 close(csock);
