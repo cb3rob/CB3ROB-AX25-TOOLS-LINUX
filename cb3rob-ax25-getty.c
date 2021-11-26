@@ -218,12 +218,13 @@ for(n=0;n<bytes;n++)if(tbuf[n]==0x0D)tbuf[n]=0x0A;
 if(write(master,&tbuf,bytes)<1)exit(EXIT_FAILURE);
 };//SENT BYTES TO PROGRAM
 };//FD SET
-
 };//WHILE CHILD RUNNING
-printf("CHILD %d LOGIN TERMINATED\n",getpid());
+printf("child %d LOGIN %d TERMINATED\n",getpid(),ptychild);
 };//PARENT
+printf("CHILD %d WAIT FOR SOCKET %d CLOSE\n",getpid(),csock);
 sleep(60);
 close(csock);
+printf("CHILD %d TERMINATING\n",getpid());
 exit(EXIT_SUCCESS);
 };//CLIENTCODE
 
