@@ -130,7 +130,7 @@ select(csock+1,NULL,&writefds,NULL,&tv);
 //FALL THROUGH IS SEND ANYWAY TO CHECK IF STILL CONNECTED
 thisblock=AX25_MTU;flags=MSG_DONTWAIT;if((total-sent)<=AX25_MTU){thisblock=(total-sent);flags|=MSG_EOR;};
 printf("%s CLIENT %d SENDING: %ld SENT: %ld TOTAL: %ld\n",srcbtime(0),getpid(),thisblock,sent,total);
-fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK);
+//SEND TO DISCONNECTED PEER ACTUALLY WILL BLOCK FOREVER ANYWAY REGARDLESS OF NONBLOCK SETTINGS ON AX.25 SOCK_SEQPACKET BUT IT WILL TRIGGER SIGPIPE... HANDLE SIGPIPE OR DEFUNCT PROCESS!
 bytes=send(csock,(uint8_t*)data+sent,thisblock,flags);
 printf("%s CLIENT %d SENT: %ld\n",srcbtime(0),getpid(),bytes);
 if(bytes<1)break;
