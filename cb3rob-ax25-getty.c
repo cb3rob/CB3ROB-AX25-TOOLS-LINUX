@@ -7,6 +7,11 @@
 
 //ALPHA DEVELOPMENT STATUS - UNDER CONSTRUCTION - NO ASSUMPTIONS TOWARDS SECURITY
 
+//root 9254  0.0  0.0   6592   808 pts/0    S+   12:51   0:00  \_ ./cb3rob-ax25-getty KISSMX      <--- MAIN LISTEN DAEMON
+//root 9289  0.0  0.0  15048  1832 pts/0    S+   12:52   0:00      \_ ./cb3rob-ax25-getty KISSMX  <--- CHILD AX.25 HANDLER
+//root 9290  0.0  0.0  85036  4544 pts/4    Ss   12:52   0:00          \_ /bin/login              <--- CHILD PTY HANDLER EXEC(/BIN/LOGIN)
+//user 9342  0.2  0.0  23880  5164 pts/4    S+   12:53   0:00             \_ -bash                <--- SHELL
+
 #include<fcntl.h>
 #include<linux/ax25.h>
 #include<stdio.h>
@@ -147,7 +152,7 @@ baddr.fsa_ax25.sax25_ndigis=1;
 if(calltobin(interface,&baddr.fsa_digipeater[0])==-1){printf("INVALID INTERFACE-CALLSIGN: %s!\n",interface);exit(EXIT_FAILURE);};
 addresstoascii(&baddr.fsa_digipeater[0],interfacecall);
 };
-if(bind(bsock,(struct sockaddr*)&baddr,sizeof(struct full_sockaddr_ax25))==-1){printf("BIND FAILED! - IS THERE AN INTERFACE WITH THAT CALLSIGN?\n");sleep(1);continue;};
+if(bind(bsock,(struct sockaddr*)&baddr,sizeof(struct full_sockaddr_ax25))==-1){printf("BIND FAILED! - IS THERE AN INTERFACE WITH CALLSIGN %s?\n",((interface==NULL)?service:interface));sleep(1);continue;};
 if(listen(bsock,0)==-1){printf("LISTEN FAILED\n");sleep(1);continue;};
 addresstoascii(&baddr.fsa_ax25.sax25_call,destcall);
 printf("BOUND TO: %s",destcall);
