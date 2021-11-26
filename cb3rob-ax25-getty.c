@@ -125,14 +125,14 @@ FD_SET(csock,&writefds);
 tv.tv_sec=60;
 tv.tv_usec=0;
 //ACTUALLY HAVE TO SELECT BEFORE WRITE. OR STUFF GOES MISSING HERE TOO. WELCOME TO LINUX
-printf("CHILD %d WAIT FOR SELECT\n",getpid());
+printf("%s CLIENT %d WAIT FOR SELECT\n",srcbtime(0),getpid());
 select(csock+1,NULL,&writefds,NULL,&tv);
 //FALL THROUGH IS SEND ANYWAY TO CHECK IF STILL CONNECTED
 thisblock=AX25_MTU;flags=0;if((total-sent)<=AX25_MTU){thisblock=(total-sent);flags=MSG_EOR;};
-printf("CHILD %d SENDING: %ld SENT: %ld TOTAL: %ld\n",getpid(),thisblock,sent,total);
+printf("%s CLIENT %d SENDING: %ld SENT: %ld TOTAL: %ld\n",srcbtime(0),getpid(),thisblock,sent,total);
 bytes=send(csock,(uint8_t*)data+sent,thisblock,flags);
-printf("CHILD %d SENT: %ld\n",getpid(),bytes);
-if(bytes==-1){printf("CHILD %d DISCONNECTED UPON SEND\n",getpid());close(csock);exit(EXIT_FAILURE);};
+printf("%s CLIENT %d SENT: %ld\n",srcbtime(0),getpid(),bytes);
+if(bytes==-1){printf("%s CLIENT %d DISCONNECTED UPON SEND\n",srcbtime(0),getpid());close(csock);exit(EXIT_FAILURE);};
 sent+=bytes;
 };//WHILE DATA REMAINING
 };//SENDCLIENT
@@ -201,7 +201,7 @@ if(FD_ISSET(master,&readfds)){
 //STICK TO MTU SIZE - TBUF IS ONE LONGER FOR TRAILING ZERO ON STRINGS INTERNALLY
 bytes=read(master,&tbuf,AX25_MTU);
 if(bytes>0){
-printf("%s CHILD %d READ %ld BYTES FROM LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
+printf("%s CLIENT %d READ %ld BYTES FROM LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
 //HAVE TERMIOS DO THIS
 for(n=0;n<bytes;n++)if(tbuf[n]==0x0A)tbuf[n]=0x0D;
 sendclient(&tbuf,bytes);
@@ -212,18 +212,18 @@ sendclient(&tbuf,bytes);
 if(FD_ISSET(csock,&readfds)){
 bytes=recv(csock,&tbuf,sizeof(tbuf),0);
 if(bytes>0){
-printf("%s CHILD %d SENT %ld BYTES TO LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
+printf("%s CLIENT %d SENT %ld BYTES TO LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
 //HAVE TERMIOS DO THIS
 for(n=0;n<bytes;n++)if(tbuf[n]==0x0D)tbuf[n]=0x0A;
 if(write(master,&tbuf,bytes)<1)exit(EXIT_FAILURE);
 };//SENT BYTES TO PROGRAM
 };//FD SET
 };//WHILE CHILD RUNNING
-printf("%s CHILD %d LOGIN %d TERMINATED\n",srcbtime(0),getpid(),ptychild);
+printf("%s CLIENT %d LOGIN %d TERMINATED\n",srcbtime(0),getpid(),ptychild);
 };//PARENT
-printf("%s CHILD %d WAIT FOR SOCKET %d CLOSE\n",srcbtime(0),getpid(),csock);
-FD_ZERO(&readfds);
+printf("%s CLIENT %d WAIT FOR SOCKET %d CLOSE\n",srcbtime(0),getpid(),csock);
 //WAIT AT MOST 60 SECONDS FOR CLIENT TO CLOSE SOCKET OR CLOSE SOCKET OURSELVES.
+FD_ZERO(&readfds);
 tv.tv_sec=60;
 tv.tv_usec=0;
 //THIS BIT IS KINDA PROBLEMATIC AS CLOSING A SOCKET BEFORE ALL DATA IS FULLY PROCESSED ON THE OTHER SIDE LEADS TO REMAINING DATA GETTING LOST
@@ -234,7 +234,7 @@ if(recv(csock,&tbuf,sizeof(tbuf),0)<1)break;//CHECK IF OTHER END DIDN'T DISCONNE
 };//WAITCLIENTCLOSE
 bzero(&tbuf,sizeof(tbuf));
 close(csock);
-printf("%s CHILD %d TERMINATED\n",srcbtime(0),getpid());
+printf("%s CLIENT %d TERMINATED\n",srcbtime(0),getpid());
 exit(EXIT_SUCCESS);
 };//CLIENTCODE
 
