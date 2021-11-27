@@ -29,7 +29,7 @@
 
 struct timeval tv;
 
-int sockfd;
+int sock;
 int true;
 struct sockaddr_in saddr;
 
@@ -93,17 +93,17 @@ printf("\n");
 
 void setuplistener(){
 while(1){
-sockfd=socket(PF_INET,SOCK_STREAM|SOCK_NONBLOCK,IPPROTO_TCP);
-if(sockfd==-1){printf("%s SOCKET CREATION FAILED\n",srcbtime(0));sleep(1);continue;};
+sock=socket(PF_INET,SOCK_STREAM|SOCK_NONBLOCK,IPPROTO_TCP);
+if(sock==-1){printf("%s SOCKET CREATION FAILED\n",srcbtime(0));sleep(1);continue;};
 true=1;
-setsockopt(sockfd,SOL_SOCKET,SO_REUSEADDR,(char*)&true,sizeof(int));
+setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,(char*)&true,sizeof(int));
 true=1;
-setsockopt(sockfd,SOL_SOCKET,SO_KEEPALIVE,(char*)&true,sizeof(int));
+setsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,(char*)&true,sizeof(int));
 saddr.sin_family=AF_INET;
 saddr.sin_port=htons(8001);
 saddr.sin_addr.s_addr=INADDR_ANY;
-if(bind(sockfd,(struct sockaddr*)&saddr,sizeof(saddr))!=0){printf("%s SOCKET BIND FAILED\n",srcbtime(0));close(sockfd);sleep(1);continue;};
-if(listen(sockfd,MAXBACKLOG)!=0){printf("%s SOCKET LISTEN FAILED\n",srcbtime(0));close(sockfd);sleep(1);continue;};
+if(bind(sock,(struct sockaddr*)&saddr,sizeof(saddr))!=0){printf("%s SOCKET BIND FAILED\n",srcbtime(0));close(sock);sleep(1);continue;};
+if(listen(sock,MAXBACKLOG)!=0){printf("%s SOCKET LISTEN FAILED\n",srcbtime(0));close(sock);sleep(1);continue;};
 printf("%s SOCKET LISTEN SUCCESS\n",srcbtime(0));
 break;
 };//WHILE 1
@@ -122,8 +122,8 @@ for(slot=0;slot<MAXCLIENTS;slot++)cl[slot].fd=-1;
 FD_ZERO(&readfds);
 FD_ZERO(&writefds);
 FD_ZERO(&exceptfds);
-FD_SET(sockfd,&readfds);
-nfds=sockfd+1;
+FD_SET(sock,&readfds);
+nfds=sock+1;
 
 while(1){
 
@@ -131,18 +131,17 @@ while(1){
 tv.tv_sec=30;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
-FD_SET(sockfd,&readfds);
-nfds=sockfd;
+FD_SET(sock,&readfds);
+nfds=sock;
 for(slot=0;slot<MAXCLIENTS;slot++)if(cl[slot].fd!=-1){FD_SET(cl[slot].fd,&readfds);if(nfds<cl[slot].fd)nfds=cl[slot].fd;};
-nfds++;
 printf("%s ENTERING SELECT\n",srcbtime(0));
-active=select(nfds,&readfds,NULL,NULL,&tv);
+active=select(nfds+1,&readfds,NULL,NULL,&tv);
 printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),active);
 
 //FIND FIRST FREE SLOT
 for(slot=0;(slot<MAXCLIENTS)&&(cl[slot].fd!=-1);slot++);
 //ACCEPT 1 CLIENT PER LOOP
-cl[slot].fd=accept(sockfd,NULL,0);//NON BLOCK
+cl[slot].fd=accept(sock,NULL,0);//NON BLOCK
 //DON'T OVERFLOW MAXCLIENTS TABLE
 if(cl[slot].fd!=-1){
 //HAVE CLIENT
