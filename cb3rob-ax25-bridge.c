@@ -138,6 +138,8 @@ needreload=1;
 
 fcntl(sock,F_SETFL,fcntl(sock,F_GETFL,0)|O_NONBLOCK);
 
+bzero(&dsockaddrll,sizeof(struct sockaddr_ll));
+
 FD_ZERO(&readfds);
 while(1){
 while(needreload==1)getinterfaces();
@@ -169,6 +171,10 @@ pctr+=AXALEN;
 //SRC ADDR
 printf("FROM: %s SIZE: %ld\n",displaycall(pctr),bytes);
 
+dsockaddrll.sll_family=ssockaddrll.sll_family;
+dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
+dsockaddrll.sll_hatype=ssockaddrll.sll_hatype;
+
 for(po=0;po<portcount;po++){
 //NOT BRIDGING TO SOURCE INTERFACE
 if(myinterfaces[po].ifindex==ssockaddrll.sll_ifindex)continue;
@@ -176,11 +182,8 @@ if(myinterfaces[po].ifindex==ssockaddrll.sll_ifindex)continue;
 if(!(myinterfaces[po].status&(IFF_UP|IFF_RUNNING))){needreload=1;continue;};
 //ALL FINE, FORWARD PACKET
 printf("FORWARDING PACKET OVER INTERFACE %s (%d) TO %s\n",myinterfaces[po].ifname,myinterfaces[po].ifindex,displaycall(buf+1));
-bzero(&dsockaddrll,sizeof(struct sockaddr_ll));
-dsockaddrll.sll_family=ssockaddrll.sll_family;
+
 dsockaddrll.sll_ifindex=myinterfaces[po].ifindex;
-dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
-dsockaddrll.sll_hatype=ssockaddrll.sll_hatype;
 
 if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,sizeof(struct sockaddr_ll))==-1){perror("SENDTO");needreload=1;continue;};
 };//FOR FORWARD PACKET TO EACH INTERFACE THAT WAS UP AT PROGRAM START IT DID NOT ORIGINATE FROM
