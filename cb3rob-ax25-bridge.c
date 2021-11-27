@@ -88,21 +88,21 @@ struct ifreq ifr;
 bzero(&myinterfaces,sizeof(myinterfaces));
 printf("SCANNING AX.25 INTERFACES\n");
 //GETIFADDRS WORKS WITHOUT IP
-if(getifaddrs(&ifaddr)==-1){perror("getifaddrs");exit(EXIT_FAILURE);};
+if(getifaddrs(&ifaddr)==-1){perror("GETIFADDRS");exit(EXIT_FAILURE);};
 for(ifa=ifaddr;(ifa!=NULL&&portcount<MAX_PORTS);ifa=ifa->ifa_next){
 if(ifa->ifa_addr==NULL)continue;
 //CHECK FOR AF_PACKET - WE NEED IT - THEY ALL HAVE IT - IT DOES AVOID DOUBLE NAMES ON OTHER FAMILIES
 if(ifa->ifa_addr->sa_family!=AF_PACKET)continue;
 //ONLY HAVE TO SET THE NAME ONCE
 strncpy(ifr.ifr_name,ifa->ifa_name,IFNAMSIZ-1);
-if(ioctl(sock,SIOCGIFFLAGS,&ifr)<0){perror("ioctl");exit(EXIT_FAILURE);};
+if(ioctl(sock,SIOCGIFFLAGS,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 myinterfaces[portcount].status=ifr.ifr_flags;
-if(ioctl(sock,SIOCGIFHWADDR,&ifr)<0){perror("ioctl");exit(EXIT_FAILURE);};
+if(ioctl(sock,SIOCGIFHWADDR,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 if(ifr.ifr_hwaddr.sa_family==AF_AX25){
 bcopy(ifr.ifr_hwaddr.sa_data,myinterfaces[portcount].netcall,7);
 strncpy(myinterfaces[portcount].ifname,ifr.ifr_name,sizeof(myinterfaces[portcount].ifname));
 strncpy(myinterfaces[portcount].asciicall,displaycall((uint8_t*)myinterfaces[portcount].netcall),sizeof(myinterfaces[portcount].asciicall));
-if(ioctl(sock,SIOCGIFINDEX,&ifr)<0){perror("ioctl");exit(EXIT_FAILURE);};
+if(ioctl(sock,SIOCGIFINDEX,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 myinterfaces[portcount].ifindex=ifr.ifr_ifindex;
 printf("FOUND AX.25 PORT %d: %d %s %s STATUS: %s\n",portcount,myinterfaces[portcount].ifindex,myinterfaces[portcount].ifname,myinterfaces[portcount].asciicall,((myinterfaces[portcount].status&(IFF_UP|IFF_RUNNING))?"UP":"DOWN"));
 portcount++;
@@ -123,8 +123,9 @@ uint8_t buf[PACKET_SIZE];
 
 fd_set readfds;
 struct timeval tv;
+if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
 
-if((sock=socket(PF_PACKET,SOCK_RAW,htons(ETH_P_AX25)))==-1){perror("SOCKET - THIS PROGRAM MUST BE RUN AS ROOT");exit(EXIT_FAILURE);};
+if((sock=socket(PF_PACKET,SOCK_RAW,htons(ETH_P_AX25)))==-1){perror("SOCKET");exit(EXIT_FAILURE);};
 
 //THIS DOESN'T WORK WITH THE CURRENT VERSION OF THE KERNEL.
 //THEREFORE PACKETS ORIGINATING FROM TERMINAL SOFTWARE RUNNING ON THE MACHINE THAT RUNS THE BRIDGE NEVER GET BRIDGED.
@@ -185,7 +186,7 @@ dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
 dsockaddrll.sll_hatype=ssockaddrll.sll_hatype;
 
 clen=sizeof(struct sockaddr_ll);
-if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,clen)==-1){perror("sendto");needreload=1;continue;};
+if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,clen)==-1){perror("SENDTO");needreload=1;continue;};
 };//FOR FORWARD PACKET TO EACH INTERFACE THAT WAS UP AT PROGRAM START IT DID NOT ORIGINATE FROM
 
 };//WHILE 1
