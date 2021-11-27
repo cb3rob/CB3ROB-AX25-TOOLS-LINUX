@@ -45,8 +45,8 @@
 #include<stdint.h>
 
 #define MAX_PORTS 32
-#define AXALEN 7
 #define PACKET_SIZE 1500
+#define AXALEN 7
 
 struct sockaddr_ll ssockaddrll;
 struct sockaddr_ll dsockaddrll;
