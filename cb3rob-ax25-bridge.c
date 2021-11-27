@@ -96,7 +96,7 @@ if(ioctl(sock,SIOCGIFHWADDR,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 if(ifr.ifr_hwaddr.sa_family==AF_AX25){
 bcopy(ifr.ifr_hwaddr.sa_data,myinterfaces[portcount].netcall,7);
 strncpy(myinterfaces[portcount].ifname,ifr.ifr_name,sizeof(myinterfaces[portcount].ifname));
-strncpy(myinterfaces[portcount].asciicall,displaycall((uint8_t*)myinterfaces[portcount].netcall),sizeof(myinterfaces[portcount].asciicall));
+strncpy(myinterfaces[portcount].asciicall,displaycall((uint8_t*)myinterfaces[portcount].netcall),sizeof(myinterfaces[portcount].asciicall)-1);
 if(ioctl(sock,SIOCGIFFLAGS,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 myinterfaces[portcount].status=ifr.ifr_flags;
 if(ioctl(sock,SIOCGIFINDEX,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
