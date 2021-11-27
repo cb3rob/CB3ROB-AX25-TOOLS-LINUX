@@ -25,6 +25,7 @@
 
 #define MAXPACKETLENGTH 3000
 #define MAXCLIENTS 100
+#define MAXBACKLOG 16
 
 struct timeval tv;
 
@@ -102,7 +103,7 @@ saddr.sin_family=AF_INET;
 saddr.sin_port=htons(8001);
 saddr.sin_addr.s_addr=INADDR_ANY;
 if(bind(sockfd,(struct sockaddr*)&saddr,sizeof(saddr))!=0){printf("%s SOCKET BIND FAILED\n",srcbtime(0));close(sockfd);sleep(1);continue;};
-if(listen(sockfd,1024)!=0){printf("%s SOCKET LISTEN FAILED\n",srcbtime(0));close(sockfd);sleep(1);continue;};
+if(listen(sockfd,MAXBACKLOG)!=0){printf("%s SOCKET LISTEN FAILED\n",srcbtime(0));close(sockfd);sleep(1);continue;};
 printf("%s SOCKET LISTEN SUCCESS\n",srcbtime(0));
 break;
 };//WHILE 1

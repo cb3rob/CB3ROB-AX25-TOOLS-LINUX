@@ -15,6 +15,8 @@
 #include<unistd.h>
 #include<stdint.h>
 
+#define MAXBACKLOG 16
+
 int bsock;
 int csock;
 char tbuf[257];
@@ -137,7 +139,7 @@ if(calltobin(interface,&baddr.fsa_digipeater[0])==-1){printf("INVALID INTERFACE-
 addresstoascii(&baddr.fsa_digipeater[0],interfacecall);
 };
 if(bind(bsock,(struct sockaddr*)&baddr,sizeof(struct full_sockaddr_ax25))==-1){printf("BIND FAILED! - IS THERE AN INTERFACE WITH CALLSIGN %s?\n",((interface==NULL)?destcall:interfacecall));sleep(1);continue;};
-if(listen(bsock,0)==-1){printf("LISTEN FAILED\n");sleep(1);continue;};
+if(listen(bsock,MAXBACKLOG)==-1){printf("LISTEN FAILED\n");sleep(1);continue;};
 printf("BOUND TO: %s",destcall);
 if(baddr.fsa_ax25.sax25_ndigis==1)printf(" ON INTERFACE: %s",interfacecall);
 printf("\n");

@@ -29,9 +29,11 @@
 #include<wait.h>
 #include<signal.h>
 
+#define MAXBACKLOG 16
+
 int bsock;
 int csock;
-char tbuf[257];
+char tbuf[(AX25_MTU*8)];//MORE EFFECTIVE THROUGHPUT WHEN SENDING IN BURST
 struct full_sockaddr_ax25 baddr;
 struct full_sockaddr_ax25 caddr;
 socklen_t clen;
@@ -156,7 +158,7 @@ if(calltobin(interface,&baddr.fsa_digipeater[0])==-1){printf("INVALID INTERFACE-
 addresstoascii(&baddr.fsa_digipeater[0],interfacecall);
 };
 if(bind(bsock,(struct sockaddr*)&baddr,sizeof(struct full_sockaddr_ax25))==-1){printf("BIND FAILED! - IS THERE AN INTERFACE WITH CALLSIGN %s?\n",((interface==NULL)?destcall:interfacecall));sleep(1);continue;};
-if(listen(bsock,0)==-1){printf("LISTEN FAILED\n");sleep(1);continue;};
+if(listen(bsock,MAXBACKLOG)==-1){printf("LISTEN FAILED\n");sleep(1);continue;};
 printf("BOUND TO: %s",destcall);
 if(baddr.fsa_ax25.sax25_ndigis==1)printf(" ON INTERFACE: %s",interfacecall);
 printf("\n");
@@ -214,7 +216,7 @@ select(nfds+1,&readfds,NULL,NULL,&tv);
 //BYTES FROM PROGRAM
 if(FD_ISSET(master,&readfds)){
 //STICK TO MTU SIZE - TBUF IS ONE LONGER FOR TRAILING ZERO ON STRINGS INTERNALLY
-bytes=read(master,&tbuf,AX25_MTU);
+bytes=read(master,&tbuf,sizeof(tbuf));
 if(bytes<1)termclient(csock,master,ptychild);
 if(bytes>0){
 printf("%s CLIENT %d READ %ld BYTES FROM LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
