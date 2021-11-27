@@ -166,7 +166,7 @@ if(ssockaddrll.sll_family!=AF_PACKET)continue;
 if(ssockaddrll.sll_hatype!=ARPHRD_AX25)continue;
 
 printf("============================================\n");
-printf("INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",ssockaddrll.sll_ifindex,ssockaddrll.sll_family,ntohs(ssockaddrll.sll_protocol),displaycall(pctr));
+printf("INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),displaycall(pctr));
 pctr+=AXALEN;
 //SRC ADDR
 printf("FROM: %s SIZE: %ld\n",displaycall(pctr),bytes);
