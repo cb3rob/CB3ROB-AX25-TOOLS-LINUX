@@ -50,14 +50,12 @@
 
 struct sockaddr_ll ssockaddrll;
 struct sockaddr_ll dsockaddrll;
+socklen_t clen;
 
 int portcount;
 int needreload;
 
-socklen_t clen;
 int sock;
-
-int true;
 
 struct interfaces{
 int ifindex;
@@ -73,8 +71,7 @@ char *displaycall(uint8_t *c){
 static char a[10];
 int n;
 for(n=0;(n<6)&&(c[n]!=0x40);n++)a[n]=(c[n]>>1);
-a[n++]='-';
-snprintf(&a[n],3,"%d",(c[6]>>1)&0x0F);
+snprintf(&a[n],4,"-%d",(c[6]>>1)&0x0F);
 return(a);
 };//DISPLAYCALL
 
@@ -185,8 +182,7 @@ dsockaddrll.sll_ifindex=myinterfaces[po].ifindex;
 dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
 dsockaddrll.sll_hatype=ssockaddrll.sll_hatype;
 
-clen=sizeof(struct sockaddr_ll);
-if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,clen)==-1){perror("SENDTO");needreload=1;continue;};
+if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,sizeof(struct sockaddr_ll))==-1){perror("SENDTO");needreload=1;continue;};
 };//FOR FORWARD PACKET TO EACH INTERFACE THAT WAS UP AT PROGRAM START IT DID NOT ORIGINATE FROM
 
 };//WHILE 1
