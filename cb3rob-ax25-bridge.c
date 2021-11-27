@@ -27,6 +27,7 @@
 // It works as-if the client callsign would be directly connected to the tnc/radio
 
 #include<arpa/inet.h>
+#include<fcntl.h>
 #include<ifaddrs.h>
 #include<linux/if_packet.h>
 #include<linux/if_ether.h>
@@ -35,6 +36,7 @@
 #include<sys/ioctl.h>
 #include<sys/socket.h>
 #include<sys/types.h>
+#include<sys/time.h>
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -51,6 +53,9 @@ struct sockaddr_ll dsockaddrll;
 
 int portcount;
 int needreload;
+
+socklen_t clen;
+int sock;
 
 int true;
 
@@ -78,10 +83,8 @@ void requestreload(){needreload=1;};
 
 void getinterfaces(){
 portcount=0;
-int socktemp;
 struct ifaddrs *ifaddr, *ifa;
 struct ifreq ifr;
-if((socktemp=socket(PF_PACKET,SOCK_RAW,htons(ETH_P_AX25)))==-1){perror("SOCKET - THIS PROGRAM MUST BE RUN AS ROOT");exit(EXIT_FAILURE);};
 bzero(&myinterfaces,sizeof(myinterfaces));
 printf("SCANNING AX.25 INTERFACES\n");
 //GETIFADDRS WORKS WITHOUT IP
@@ -92,33 +95,35 @@ if(ifa->ifa_addr==NULL)continue;
 if(ifa->ifa_addr->sa_family!=AF_PACKET)continue;
 //ONLY HAVE TO SET THE NAME ONCE
 strncpy(ifr.ifr_name,ifa->ifa_name,IFNAMSIZ-1);
-if(ioctl(socktemp,SIOCGIFFLAGS,&ifr)<0){perror("ioctl");exit(EXIT_FAILURE);};
+if(ioctl(sock,SIOCGIFFLAGS,&ifr)<0){perror("ioctl");exit(EXIT_FAILURE);};
 myinterfaces[portcount].status=ifr.ifr_flags;
-if(ioctl(socktemp,SIOCGIFHWADDR,&ifr)<0){perror("ioctl");exit(EXIT_FAILURE);};
+if(ioctl(sock,SIOCGIFHWADDR,&ifr)<0){perror("ioctl");exit(EXIT_FAILURE);};
 if(ifr.ifr_hwaddr.sa_family==AF_AX25){
 bcopy(ifr.ifr_hwaddr.sa_data,myinterfaces[portcount].netcall,7);
 strncpy(myinterfaces[portcount].ifname,ifr.ifr_name,sizeof(myinterfaces[portcount].ifname));
 strncpy(myinterfaces[portcount].asciicall,displaycall((uint8_t*)myinterfaces[portcount].netcall),sizeof(myinterfaces[portcount].asciicall));
-if(ioctl(socktemp,SIOCGIFINDEX,&ifr)<0){perror("ioctl");exit(EXIT_FAILURE);};
+if(ioctl(sock,SIOCGIFINDEX,&ifr)<0){perror("ioctl");exit(EXIT_FAILURE);};
 myinterfaces[portcount].ifindex=ifr.ifr_ifindex;
 printf("FOUND AX.25 PORT %d: %d %s %s STATUS: %s\n",portcount,myinterfaces[portcount].ifindex,myinterfaces[portcount].ifname,myinterfaces[portcount].asciicall,((myinterfaces[portcount].status&(IFF_UP|IFF_RUNNING))?"UP":"DOWN"));
 portcount++;
 };//IF AX.25
 };//FOR INTERFACES
 freeifaddrs(ifaddr);
-close(socktemp);
 needreload=0;
 printf("DONE SCANNING INTERFACES\n");
 if(portcount<2){printf("INSUFFICIENT (%d) AX.25 PORTS FOR BRIDGING\n",portcount);needreload=1;sleep(5);};//INSUFFICIENT
 };//GETINTERFACES
 
 int main(void){
-socklen_t clen;
-int sock;
 ssize_t bytes;
 int po;
+
 uint8_t *pctr;
 uint8_t buf[PACKET_SIZE];
+
+fd_set readfds;
+struct timeval tv;
+
 if((sock=socket(PF_PACKET,SOCK_RAW,htons(ETH_P_AX25)))==-1){perror("SOCKET - THIS PROGRAM MUST BE RUN AS ROOT");exit(EXIT_FAILURE);};
 
 //THIS DOESN'T WORK WITH THE CURRENT VERSION OF THE KERNEL.
@@ -133,6 +138,9 @@ signal(SIGHUP,requestreload);
 //FORCE RELOAD FOR STARTUP
 needreload=1;
 
+fcntl(sock,F_SETFL,fcntl(sock,F_GETFL,0)|O_NONBLOCK);
+
+FD_ZERO(&readfds);
 while(1){
 while(needreload==1)getinterfaces();
 if(portcount<2)needreload=1;
@@ -140,8 +148,13 @@ if(portcount<2)needreload=1;
 bzero(&buf,sizeof(buf));
 bzero(&ssockaddrll,sizeof(struct sockaddr_ll));
 
+tv.tv_sec=10;
+tv.tv_usec=0;
+FD_SET(sock,&readfds);
+select(sock+1,&readfds,NULL,NULL,&tv);
 clen=sizeof(struct sockaddr_ll);
 bytes=recvfrom(sock,&buf,sizeof(buf),0,(struct sockaddr*)&ssockaddrll,&clen);
+
 //DEBUG PACKET
 if(bytes<16)continue;
 pctr=buf;
