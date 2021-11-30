@@ -180,6 +180,10 @@ ssize_t bytes;
 struct termios trm;
 struct winsize wins;
 setsid();
+//NO CONTROL-C OR ANY SUCH NONSENSE BEFORE LOGIN IS FINISHED
+signal(SIGHUP,SIG_IGN);
+signal(SIGINT,SIG_IGN);
+signal(SIGQUIT,SIG_IGN);
 pid_t ptychild;ptychild=-1;
 int master;master=-1;
 void calltermclient(){printf("%s CLIENT %d SIGPIPE/SIGTERM TRIGGERED\n",srcbtime(0),getpid());termclient(csock,master,ptychild);};
