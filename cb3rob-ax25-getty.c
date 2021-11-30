@@ -33,7 +33,7 @@
 
 int bsock;
 int csock;
-char tbuf[(AX25_MTU*8)];//MORE EFFECTIVE THROUGHPUT WHEN SENDING IN BURST
+char tbuf[(AX25_MTU*7)];//MORE EFFECTIVE THROUGHPUT WHEN SENDING IN BURST
 struct full_sockaddr_ax25 baddr;
 struct full_sockaddr_ax25 caddr;
 socklen_t clen;
@@ -179,9 +179,9 @@ exit(EXIT_SUCCESS);
 int clientcode(){
 //FORK CHILD
 ssize_t bytes;
+setsid();
 pid_t ptychild;ptychild=-1;
 int master;master=-1;
-int n;
 void calltermclient(){printf("%s CLIENT %d SIGPIPE/SIGTERM TRIGGERED\n",srcbtime(0),getpid());termclient(csock,master,ptychild);};
 signal(SIGPIPE,calltermclient);
 signal(SIGTERM,calltermclient);
@@ -194,12 +194,20 @@ snprintf(tbuf,sizeof(tbuf)-1,"%s %s -> %s\r\r",srcbtime(0),sourcecall,destcall);
 if(sendclient(tbuf,0)<0)termclient(csock,master,ptychild);
 bzero(&tbuf,sizeof(tbuf));
 bzero(&trm,sizeof(trm));
+//SET SOME BASIC TERMIOS STUFF TO AT LEAST GET CRNL - TERMIOS DOESN'T SEEM TO DO JUST CARRIAGE RETURN ONLY
+//PACKET RADIO PROGRAMS PREFER CARRIAGE RETURN ONLY BUT WILL IGNORE NEWLINE (OR SHOULD).
+//FILE TRANSFER PROGRAMS DEMAND 8 BIT TRANSPARENCY.
+//NOTE THAT /bin/login DOESN'T RESET THE TERMINAL TO IT'S PROPER TERMCAP/TERMINFO SPECIFICATION EITHER
 cfmakeraw(&trm);
+trm.c_iflag|=ICRNL;
+trm.c_oflag|=ONLCR|OPOST;
 ptychild=forkpty(&master,NULL,&trm,NULL);
 if(ptychild==0){
 //CHILD (LOGIN)
 close(csock);csock=-1;//DON'T WANT THAT HERE
-execlp("/bin/login","/bin/login",NULL);
+char*loginargv[]={"/bin/login","-p",NULL};
+char*loginenvp[]={"TERM=dumb",NULL};
+execve("/bin/login",&loginargv[0],&loginenvp[0]);
 exit(EXIT_SUCCESS);
 }else{
 //PARENT (DATA RELAY)
@@ -221,7 +229,7 @@ if(bytes<1)termclient(csock,master,ptychild);
 if(bytes>0){
 printf("%s CLIENT %d READ %ld BYTES FROM LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
 //HAVE TERMIOS DO THIS
-for(n=0;n<bytes;n++)if(tbuf[n]==0x0A)tbuf[n]=0x0D;
+//for(n=0;n<bytes;n++)if(tbuf[n]==0x0A)tbuf[n]=0x0D;
 if(sendclient(&tbuf,bytes)<1)termclient(csock,master,ptychild);
 };//RECEIVED BYTES FROM PROGRAM
 };//FD SET
@@ -233,7 +241,7 @@ if(bytes<1)termclient(csock,master,ptychild);
 if(bytes>0){
 printf("%s CLIENT %d SENT %ld BYTES TO LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
 //HAVE TERMIOS DO THIS
-for(n=0;n<bytes;n++)if(tbuf[n]==0x0D)tbuf[n]=0x0A;
+//for(n=0;n<bytes;n++)if(tbuf[n]==0x0D)tbuf[n]=0x0A;
 if(write(master,&tbuf,bytes)<1)termclient(csock,master,ptychild);
 };//SENT BYTES TO PROGRAM
 };//FD SET
