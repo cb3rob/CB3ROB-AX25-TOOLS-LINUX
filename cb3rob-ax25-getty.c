@@ -42,8 +42,6 @@ fd_set readfds;
 struct timeval tv;
 int nfds;
 
-struct termios trm;
-
 char sourcecall[10];
 char destcall[10];
 char servicecall[10];
@@ -179,6 +177,8 @@ exit(EXIT_SUCCESS);
 int clientcode(){
 //FORK CHILD
 ssize_t bytes;
+struct termios trm;
+struct winsize wins;
 setsid();
 pid_t ptychild;ptychild=-1;
 int master;master=-1;
@@ -193,7 +193,7 @@ addresstoascii(&caddr.fsa_ax25.sax25_call,sourcecall);
 snprintf(tbuf,sizeof(tbuf)-1,"%s %s -> %s\r\r",srcbtime(0),sourcecall,destcall);
 if(sendclient(tbuf,0)<0)termclient(csock,master,ptychild);
 bzero(&tbuf,sizeof(tbuf));
-bzero(&trm,sizeof(trm));
+bzero(&trm,sizeof(struct termios));
 //SET SOME BASIC TERMIOS STUFF TO AT LEAST GET CRNL - TERMIOS DOESN'T SEEM TO DO JUST CARRIAGE RETURN ONLY
 //PACKET RADIO PROGRAMS PREFER CARRIAGE RETURN ONLY BUT WILL IGNORE NEWLINE (OR SHOULD).
 //FILE TRANSFER PROGRAMS DEMAND 8 BIT TRANSPARENCY.
@@ -201,7 +201,10 @@ bzero(&trm,sizeof(trm));
 cfmakeraw(&trm);
 trm.c_iflag|=ICRNL;
 trm.c_oflag|=ONLCR|OPOST;
-ptychild=forkpty(&master,NULL,&trm,NULL);
+bzero(&wins,sizeof(struct winsize));
+wins.ws_row=24;
+wins.ws_col=80;
+ptychild=forkpty(&master,NULL,&trm,&wins);
 if(ptychild==0){
 //CHILD (LOGIN)
 close(csock);csock=-1;//DON'T WANT THAT HERE
