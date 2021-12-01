@@ -1,4 +1,4 @@
-## CB3ROB-AX25-TOOLS-LINUX 2021-11-30T18:55:59Z (TUESDAY)
+## CB3ROB-AX25-TOOLS-LINUX 2021-12-01T23:21:32Z (WEDNESDAY)
 #
 ### cb3rob-kiss-tcp-attach.c
 links ax0 interface to KISS-TCP TNC, soundmodem (direwolf), or multiplexer server
@@ -10,6 +10,8 @@ AX.25 Bridge software to link all AX.25 interfaces on a linux box together and l
 test version for connected mode SOCK_SEQPACKET listen() AX.25 server software
 ### cb3rob-ax25-getty.c
 'telnetd' for AX.25 - runs /bin/login in a pty which gives a shell after logging in
+### cb3rob-axudp-attach.c
+'it kinda works on my computer' standalone axudp <-> bpq0 attacher. no guarantees. bad coding :P
 #
 #### None of this needs that old broken ax25lib crap or /etc/ax25/ports. just plain old linux.
 #### Also note that the KISS-TCP stuff exclusively uses channel '0' as the KISS protocol documentation is not clear on how to handle channel 'C' in regards to FEND escapes (whoopsie - guess nobody ever sold a tnc with all 16 HDLC interfaces.. ;). it would either result in 2 's in a row or not be 'the second byte' yet the documentation proclaims to support 16 channels... don't believe in any actual need for 'channels' anyway. just do the switching/routing at layer 2/3 ;)

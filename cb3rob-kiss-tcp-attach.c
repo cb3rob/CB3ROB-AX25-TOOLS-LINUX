@@ -176,7 +176,7 @@ if(FD_ISSET(sock,&readfds)){
 bytes=recv(sock,&pbfr,sizeof(pbfr),MSG_DONTWAIT);
 if(bytes==0){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);tcpconnect(argv[2],argv[3]);};
 if(bytes>0){
-printf("%s SOCKET READ: %ld BYTES: ",srcbtime(0),bytes);for(n=0;n<bytes;n++)printf(" %02X",pbfr[n]);printf("\n");
+printf("%s SOCKET RECV: %ld BYTES: ",srcbtime(0),bytes);for(n=0;n<bytes;n++)printf(" %02X",pbfr[n]);printf("\n");
 if(write(master,&pbfr,bytes)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
 };//BYTES>0
 };//FDSET
