@@ -3,15 +3,15 @@
 //One CyberBunker Avenue
 //Republic CyberBunker
 
-//COMPILE WITH gcc -O3 -o cb3rob-kiss-udp-attach cb3rob-kiss-udp-attach.c -lutil
+//COMPILE WITH gcc -O3 -o cb3rob-axudp-attach cb3rob-axudp-attach.c -lutil
 //openpty() REQUIRES -lutil
 
-//TO BRING UP AN AX.25 KISS INTERFACE (ax0,ax1,etc) TO A KISS TNC OR KISS CONCENTRATOR SERVER:
+//TO BRING UP AN AX.25 AXUDP INTERFACE (bpq0,bpq1,etc) TO AN AXUDP CONCENTRATOR SERVER:
 
 //AXUDP capability at: KE8GCL-7 ax.prime41.com 10093
 //AXUDP 149.210.161.112 93 AXNODE.AX25.NL
 
-// ./cb3rob-axudp-attach NOCALL 208.109.9.123 10093 &
+// ./cb3rob-axudp-attach NOCALL X.X.X.X 10093 &
 
 //WARNING - TEST VERSION - NASTY CODING - NO GUARANTEES
 
