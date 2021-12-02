@@ -206,7 +206,7 @@ int ok_crc(unsigned char *buf, int l)
 	return fcs == PPPGOODFCS;
 }
 
-int tapalloc(char*tdev){
+int tapalloc(char*tdev,char*callsign,int devno){
 if(tap!=-1)close(tap);
 struct ifreq ifr;
 int tap, err;
@@ -241,7 +241,7 @@ close(fdx);
 //SUCH NASTYNESS.
 //BUT CAN'T MAKE THE TAP INTERFACE ARPHRD_AX25 DIRECTLY BECAUSE IT REFUSES 7 BYTE sa_data FIELDS IN SIOCSIFHWADDR ONLY WAY TO FIND THE ASSOCIATED ETHERNET DEVICE IS THROUGH PROC IT SEEMS... YUK.
 //ANYWAY CODE THIS BETTER. LOL. "IT WORKS ON MY COMPUTER - BUT WE'RE NOT SHIPPING YOUR COMPUTER TO THE CLIENT". ANYWAY IT WORKS FOR NOW.
-sprintf(systemline,"ifconfig `cat /proc/net/bpqether|grep axudp%d|cut -d' ' -f1` hw ax25 AXUDP-%d up",devno,devno);
+sprintf(systemline,"ifconfig `cat /proc/net/bpqether|grep %s |cut -d' ' -f1` hw ax25 %s-%d up",tdev,callsign,devno);
 system(systemline);
 //GIVE THE BRIDGE (IF ANY) A KICK TO RE-INDEX INTERFACES AND START BRIDGING TO THIS ONE
 system("killall -HUP cb3rob-ax25-bridge");
@@ -308,7 +308,7 @@ if(calltobin(argv[1],&call)<1){printf("INVALID DEVICE CALLSIGN: %s\n",argv[1]);e
 
 sock=-1;udpconnect(argv[2],argv[3]);
 devno=0;
-for(tap=-1;tap==-1;devno++){sprintf(dev,"axudp%d",devno);tap=tapalloc(dev);};
+for(tap=-1;tap==-1;devno++){sprintf(dev,"axudp%d",devno);tap=tapalloc(dev,argv[1],devno);};
 
 fcntl(sock,F_SETFL,fcntl(sock,F_GETFL,0)|O_NONBLOCK);
 fcntl(tap,F_SETFL,fcntl(tap,F_GETFL,0)|O_NONBLOCK);
