@@ -60,16 +60,12 @@
 struct sockaddr_in saddr;
 struct sockaddr_in baddr;//BIND ADDRESS BECAUSE AX25IPD IS TOO STUPID TO MAINTAIN A DYNAMIC LIST OF LAST HEARD SOURCEIPS:PORTS FOR EACH 'CONNECTION' AND THAT'S THE ONLY PIECE OF DUNG WE CAN TEST THIS AGAINST.
                          //WE SIMPLY BIND TO WHATEVER PORT THE SERVER IS ON TOO (AS PER ARGV) - TAKE NOTE THAT THIS SHOULD NOT BE AN ISSUE AS STUFF LIKE AX25IPD SHOULD JUST DYNAMICALLY KEEP TRACK OF PEERS
-struct termios trm;
 struct timeval tv;
 struct hostent *he;
 int sock;
 int tap;
-int disc;
+int devno;
 char dev[IFNAMSIZ];
-int slave;
-int master;
-int true;
 int nfds;
 struct ifreq ifr;
 int fdx;
@@ -78,13 +74,14 @@ fd_set readfds;
 fd_set writefds;
 fd_set exceptfds;
 ax25_address call;
+char systemline[256];
 
 struct bpqethhdr{
 uint8_t ethdst[6];
 uint8_t ethsrc[6];
 uint16_t ptype;
 uint16_t len;
-uint8_t payload[2048];
+unsigned char payload[2048];
 };
 
 union{
@@ -193,8 +190,7 @@ u16 pppfcs(u16 fcs, unsigned char *cp, int len)
 unsigned short int compute_crc(unsigned char *buf, int l)
 {
 	int fcs;
-
-	fcs = PPPINITFCS;
+        fcs = PPPINITFCS;
 	fcs = pppfcs(fcs, buf, l);
 	fcs ^= 0xffff;
 	return fcs;
@@ -210,24 +206,24 @@ int ok_crc(unsigned char *buf, int l)
 	return fcs == PPPGOODFCS;
 }
 
-int tapalloc(char*dev){
+int tapalloc(char*tdev){
 if(tap!=-1)close(tap);
 struct ifreq ifr;
 int tap, err;
 if((tap=open("/dev/net/tun",O_RDWR))<0)return(-1);
 bzero(&ifr,sizeof(ifr));
-if(*dev)strncpy(ifr.ifr_name,dev,IFNAMSIZ);
+if(*tdev)strncpy(ifr.ifr_name,tdev,IFNAMSIZ);
 ifr.ifr_flags=IFF_TAP|IFF_NO_PI;
 if((err=ioctl(tap,TUNSETIFF,(void*)&ifr))<0){close(tap);return(-1);};
 //int val = ARPHRD_AX25; //ETH_P_AX25
 //if(ioctl(tap,TUNSETLINK,(unsigned long)val)<0)perror("TUNSETLINK");
 //if(ioctl(tap,TUNSETPERSIST,0)<0){close(tap);return(-1);};
 
-//strcpy(dev,ifr.ifr_name);
+//strcpy(tdev,ifr.ifr_name);
 //SET AX.25 NETWORK DEVICE FLAGS
 fdx=socket(PF_AX25,SOCK_DGRAM,0);
 bzero(&ifr,sizeof(struct ifreq));
-strcpy(ifr.ifr_name,dev);
+strcpy(ifr.ifr_name,tdev);
 ifr.ifr_mtu=AX25_MTU;
 ioctl(fdx,SIOCSIFMTU,&ifr);
 //ifr.ifr_hwaddr.sa_family=ARPHRD_AX25;
@@ -245,7 +241,8 @@ close(fdx);
 //SUCH NASTYNESS.
 //BUT CAN'T MAKE THE TAP INTERFACE ARPHRD_AX25 DIRECTLY BECAUSE IT REFUSES 7 BYTE sa_data FIELDS IN SIOCSIFHWADDR ONLY WAY TO FIND THE ASSOCIATED ETHERNET DEVICE IS THROUGH PROC IT SEEMS... YUK.
 //ANYWAY CODE THIS BETTER. LOL. "IT WORKS ON MY COMPUTER - BUT WE'RE NOT SHIPPING YOUR COMPUTER TO THE CLIENT". ANYWAY IT WORKS FOR NOW.
-system("ifconfig `cat /proc/net/bpqether|grep axudp|cut -d' ' -f1` hw ax25 NOCALL-15 up");
+sprintf(systemline,"ifconfig `cat /proc/net/bpqether|grep axudp%d|cut -d' ' -f1` hw ax25 NOCALL-%d up",devno,devno);
+system(systemline);
 //GIVE THE BRIDGE (IF ANY) A KICK TO RE-INDEX INTERFACES AND START BRIDGING TO THIS ONE
 system("killall -HUP cb3rob-ax25-bridge");
 return(tap);
@@ -310,7 +307,8 @@ if(argc<4){printf("USAGE: %s <CALLSIGN[-SSID]> <AXUDP-SERVER> <PORT>\n",argv[0])
 if(calltobin(argv[1],&call)<1){printf("INVALID DEVICE CALLSIGN: %s\n",argv[1]);exit(EXIT_FAILURE);};
 
 sock=-1;udpconnect(argv[2],argv[3]);
-tap=-1;tap=tapalloc("axudp");
+devno=0;
+for(tap=-1;tap==-1;devno++){sprintf(dev,"axudp%d",devno);tap=tapalloc(dev);};
 
 fcntl(sock,F_SETFL,fcntl(sock,F_GETFL,0)|O_NONBLOCK);
 fcntl(tap,F_SETFL,fcntl(tap,F_GETFL,0)|O_NONBLOCK);
@@ -341,10 +339,10 @@ while(1){
 FD_ZERO(&readfds);
 FD_SET(tap,&readfds);
 FD_SET(sock,&readfds);
-nfds=sock;if(tap>sock)nfds=tap;nfds++;
+nfds=sock;if(tap>sock)nfds=tap;
 tv.tv_sec=30;
 tv.tv_usec=0;
-select(nfds,&readfds,&writefds,&exceptfds,&tv);
+select(nfds+1,&readfds,&writefds,&exceptfds,&tv);
 
 //PACKETS THAT ARRIVE FROM AXUDP SERVER
 
@@ -353,11 +351,11 @@ bytes=recv(sock,&sockpacket.payload,sizeof(sockpacket.payload),MSG_DONTWAIT);
 if(bytes==0){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);udpconnect(argv[2],argv[3]);};
 //if(bytes>=17){//2 7 BYTE ADDRESSES, 1 CONTROL BYTE, 2 BYTE FCS
 if(bytes>=15){//2 7 BYTE ADDRESSES, 1 CONTROL BYTE, 2 BYTE FCS
-printf("%s SOCKET RECV: %ld BYTES: ",srcbtime(0),bytes);for(n=0;n<bytes;n++)printf(" %02X",sockpacket.payload[n]);printf("\n");
+//printf("%s SOCKET RECV: %ld BYTES:",srcbtime(0),bytes);for(n=0;n<bytes;n++)printf(" %02X",sockpacket.payload[n]);printf("\n");
 //NOPE. DON'T CARE FOR THE FCS FOR NOW. JUST THROW IT AWAY. IT'S PROBABLY FINE (IT SHOULD BE, IT CAME OVER THE INTERNET ;)
 //FIX THIS FOR RELEASE BUT FOR NOW IT KINDA WORKS. (AXIP AND AXUDP LITERALLY BEING THE ONLY 2 NON AIR LINK PROTOCOLS THAT NEED FCS ;)
 sockpacket.len=htons(bytes+3);//+5=INCLUDE FCS +3= STRIP THE FCS ON BPQETHER, ALSO BELOW
-printf("%s TAP WRITE: %ld BYTES: ",srcbtime(0),bytes+14);for(n=0;n<bytes+14;n++)printf(" %02X",sockpacket.ethdst[n]);printf("\n");
+//printf("%s TAP WRITE: %ld BYTES:",srcbtime(0),bytes+14);for(n=0;n<(bytes+14);n++)printf(" %02X",sockpacket.ethdst[n]);printf("\n");
 if(write(tap,&sockpacket,bytes+14)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
 };//BYTES>0
 };//FDSET
@@ -368,12 +366,16 @@ if(FD_ISSET(tap,&readfds)){
 bytes=read(tap,&tappacket,sizeof(struct bpqethhdr)-2);//LEAVE 2 BYTES SPACE TO ADD THE FCS
 if(bytes>=(16+15)){
 if(tappacket.ptype==ntohs(ETH_P_BPQ)){
-printf("%s TAP READ: %ld BYTES: ",srcbtime(0),bytes);for(n=0;n<bytes;n++)printf(" %02X",tappacket.ethdst[n]);printf("\n");
+//printf("%s TAP READ: %ld BYTES",srcbtime(0),bytes);
+//for(n=0;n<bytes;n++)printf(" %02X",(char*)&tappacket.ethdst+n);
+//printf("\n");
 fcs.fcs16=compute_crc(tappacket.payload,bytes-16);
 //FIX THIS PROPERLY WITH HOST TO NETWORK BYTE ORDER!!!!!
 tappacket.payload[(bytes-16)]=fcs.fcs8[0];
 tappacket.payload[(bytes-16)+1]=fcs.fcs8[1];
-printf("%s SOCK FCS: %02X SEND: %ld BYTES: ",srcbtime(0),fcs.fcs16,bytes-14);for(n=0;n<bytes-14;n++)printf(" %02X",tappacket.payload[n]);printf("\n");
+//printf("%s SOCK FCS: %04X SEND: %ld BYTES:",srcbtime(0),fcs.fcs16,bytes-14);
+//for(n=0;n<(bytes-14);n++)printf(" %02X",(char*)&tappacket.payload+n);
+//printf("\n");
 if(send(sock,&tappacket.payload,bytes-14,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);udpconnect(argv[2],argv[3]);};
 };//BPQ FRAME
 };//BYTES>0
