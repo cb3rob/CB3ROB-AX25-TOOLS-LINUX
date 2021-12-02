@@ -254,7 +254,7 @@ struct tm *ts;
 if(!t)t=time(NULL);
 ts=gmtime(&t);
 bzero(&rcbt,sizeof(rcbt));
-snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,(ts->tm_mon)+1,ts->tm_mday,ts->tm_hour,ts->tm_min,ts->tm_sec);
+snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,ts->tm_mon+1,ts->tm_mday,ts->tm_hour,ts->tm_min,ts->tm_sec);
 return(rcbt);
 };//SRCBTIME
 
