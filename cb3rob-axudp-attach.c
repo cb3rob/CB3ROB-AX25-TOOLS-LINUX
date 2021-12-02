@@ -224,8 +224,8 @@ if((err=ioctl(tap,TUNSETIFF,(void*)&ifr))<0){close(tap);return(-1);};
 fdx=socket(PF_AX25,SOCK_DGRAM,0);
 bzero(&ifr,sizeof(struct ifreq));
 strcpy(ifr.ifr_name,tdev);
-ifr.ifr_mtu=AX25_MTU;
-ioctl(fdx,SIOCSIFMTU,&ifr);
+//ifr.ifr_mtu=AX25_MTU;
+//ioctl(fdx,SIOCSIFMTU,&ifr);
 //ifr.ifr_hwaddr.sa_family=ARPHRD_AX25;
 //bzero(ifr.ifr_hwaddr.sa_data,sizeof(ifr.ifr_hwaddr.sa_data));
 //bcopy(&call,ifr.ifr_hwaddr.sa_data,7);
@@ -241,7 +241,7 @@ close(fdx);
 //SUCH NASTYNESS.
 //BUT CAN'T MAKE THE TAP INTERFACE ARPHRD_AX25 DIRECTLY BECAUSE IT REFUSES 7 BYTE sa_data FIELDS IN SIOCSIFHWADDR ONLY WAY TO FIND THE ASSOCIATED ETHERNET DEVICE IS THROUGH PROC IT SEEMS... YUK.
 //ANYWAY CODE THIS BETTER. LOL. "IT WORKS ON MY COMPUTER - BUT WE'RE NOT SHIPPING YOUR COMPUTER TO THE CLIENT". ANYWAY IT WORKS FOR NOW.
-sprintf(systemline,"ifconfig `cat /proc/net/bpqether|grep axudp%d|cut -d' ' -f1` hw ax25 NOCALL-%d up",devno,devno);
+sprintf(systemline,"ifconfig `cat /proc/net/bpqether|grep axudp%d|cut -d' ' -f1` hw ax25 AXUDP-%d up",devno,devno);
 system(systemline);
 //GIVE THE BRIDGE (IF ANY) A KICK TO RE-INDEX INTERFACES AND START BRIDGING TO THIS ONE
 system("killall -HUP cb3rob-ax25-bridge");
