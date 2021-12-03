@@ -176,10 +176,10 @@ while(1){
 FD_ZERO(&readfds);
 FD_SET(master,&readfds);
 FD_SET(sock,&readfds);
-nfds=sock;if(master>sock)nfds=master;nfds++;
+nfds=sock;if(master>sock)nfds=master;
 tv.tv_sec=30;
 tv.tv_usec=0;
-select(nfds,&readfds,&writefds,&exceptfds,&tv);
+select(nfds+1,&readfds,&writefds,&exceptfds,&tv);
 
 if(FD_ISSET(sock,&readfds)){
 bytes=recv(sock,&pbfr,sizeof(pbfr),MSG_DONTWAIT);
@@ -192,6 +192,7 @@ if(write(master,&pbfr,bytes)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcb
 
 //LINUX SEEMS TO HAVE A BUG IN THE ax0 N_KISS DRIVER THAT CAUSES THE FIRST 2 PACKETS TO HAVE TRANSMIT KISS CHANNEL 8 AND 2 RESPECTIVELY
 //REST OF THE PACKETS IS FINE.. CAN'T HELP THAT. NOT OUR FAULT. 1ST PACKET AFTER BRINGING UP INTERFACE: $C0 $80 2ND PACKET: $C0 $20
+//NOTE THAT WE CAN'T (EASILY) SET THE BYTE TO $00 OURSELVES AS THERE IS NO GUARANTEE OR NEED FOR ONE READ() TO CONTAIN ONE FRAMED PACKET
 
 if(FD_ISSET(master,&readfds)){
 bytes=read(master,&pbfr,sizeof(pbfr));
