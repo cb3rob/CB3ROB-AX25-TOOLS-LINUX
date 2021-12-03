@@ -54,6 +54,8 @@ int nfds;
 struct ifreq ifr;
 int fdx;
 int encap;
+unsigned char pbfr[2048];
+ssize_t bytes;
 fd_set readfds;
 fd_set writefds;
 fd_set exceptfds;
@@ -103,10 +105,15 @@ true=1;
 setsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,(char*)&true,sizeof(int));
 true=1;
 setsockopt(sock,IPPROTO_TCP,TCP_NODELAY,(char*)&true,sizeof(int));
+if(master!=-1)while((bytes=read(master,&pbfr,sizeof(pbfr)))>0)printf("%s FLUSHED: %ld BYTES FROM MASTER\n",srcbtime(0),bytes);//IF MASTER
 printf("%s CONNECTING: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));
 if(connect(sock,(struct sockaddr*)&saddr,sizeof(saddr))!=0){close(sock);sock=-1;printf("%s CONNECT ERROR: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));sleep(1);continue;};
 printf("%s CONNECTED: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));
 };//WHILE SOCK -1
+//GET RID OF OLD PACKETS COLLECTED IN PTY BEFORE COMPLETING TCP(RE-)CONNECT
+if(master!=-1)while((bytes=read(master,&pbfr,sizeof(pbfr)))>0)printf("%s FLUSHED: %ld BYTES FROM MASTER\n",srcbtime(0),bytes);//IF MASTER
+bzero(&pbfr,sizeof(pbfr));
+bytes=0;
 };//TCPCONNECT
 
 int main(int argc,char **argv){
@@ -117,7 +124,11 @@ if(argc<4){printf("USAGE: %s <CALLSIGN[-SSID]> <KISS-TCP-SERVER-OR-TNC> <PORT>\n
 
 if(calltobin(argv[1],&call)<1){printf("INVALID DEVICE CALLSIGN: %s\n",argv[1]);exit(EXIT_FAILURE);};
 
+
 //CREATE PSEUDO TTY
+master=-1;
+slave=-1;
+
 bzero(&trm,sizeof(struct termios));
 cfmakeraw(&trm);
 trm.c_cflag|=CREAD;
@@ -143,17 +154,16 @@ ifr.ifr_flags=IFF_UP|IFF_RUNNING;
 ioctl(fdx,SIOCSIFFLAGS,&ifr);
 close(fdx);
 
-sock=-1;tcpconnect(argv[2],argv[3]);
-
 //SET THE TTY TO NONBLOCK!
 fcntl(master,F_SETFL,fcntl(master,F_GETFL,0)|O_NONBLOCK);
 fcntl(slave,F_SETFL,fcntl(slave,F_GETFL,0)|O_NONBLOCK);
 
+sock=-1;tcpconnect(argv[2],argv[3]);
+
+
 printf("%s AX.25 BOUND TO DEVICE %s\n",srcbtime(0),dev);
 
 //LOOP DATA
-unsigned char pbfr[2048];
-ssize_t bytes;
 ssize_t n;
 
 FD_ZERO(&readfds);
@@ -174,7 +184,7 @@ select(nfds,&readfds,&writefds,&exceptfds,&tv);
 
 if(FD_ISSET(sock,&readfds)){
 bytes=recv(sock,&pbfr,sizeof(pbfr),MSG_DONTWAIT);
-if(bytes==0){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);tcpconnect(argv[2],argv[3]);};
+if(bytes==0){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);tcpconnect(argv[2],argv[3]);continue;};
 if(bytes>0){
 printf("%s SOCKET RECV: %ld BYTES:",srcbtime(0),bytes);for(n=0;n<bytes;n++)printf(" %02X",pbfr[n]);printf("\n");
 if(write(master,&pbfr,bytes)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
@@ -185,7 +195,7 @@ if(FD_ISSET(master,&readfds)){
 bytes=read(master,&pbfr,sizeof(pbfr));
 if(bytes>0){
 printf("%s MASTER READ: %ld BYTES:",srcbtime(0),bytes);for(n=0;n<bytes;n++)printf(" %02X",pbfr[n]);printf("\n");
-if(send(sock,&pbfr,bytes,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);tcpconnect(argv[2],argv[3]);};
+if(send(sock,&pbfr,bytes,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);tcpconnect(argv[2],argv[3]);continue;};
 };//BYTES>0
 };//FDSET
 

@@ -1,4 +1,4 @@
-## CB3ROB-AX25-TOOLS-LINUX 2021-12-02T20:47:15Z (THURSDAY)
+## CB3ROB-AX25-TOOLS-LINUX 2021-12-03T16:34:02Z (FRIDAY)
 #
 ### cb3rob-kiss-tcp-attach.c
 links ax0 interface to KISS-TCP TNC, soundmodem (direwolf), or multiplexer server
