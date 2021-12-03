@@ -124,7 +124,6 @@ if(argc<4){printf("USAGE: %s <CALLSIGN[-SSID]> <KISS-TCP-SERVER-OR-TNC> <PORT>\n
 
 if(calltobin(argv[1],&call)<1){printf("INVALID DEVICE CALLSIGN: %s\n",argv[1]);exit(EXIT_FAILURE);};
 
-
 //CREATE PSEUDO TTY
 master=-1;
 slave=-1;
@@ -190,6 +189,9 @@ printf("%s SOCKET RECV: %ld BYTES:",srcbtime(0),bytes);for(n=0;n<bytes;n++)print
 if(write(master,&pbfr,bytes)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
 };//BYTES>0
 };//FDSET
+
+//LINUX SEEMS TO HAVE A BUG IN THE ax0 N_KISS DRIVER THAT CAUSES THE FIRST 2 PACKETS TO HAVE TRANSMIT KISS CHANNEL 8 AND 2 RESPECTIVELY
+//REST OF THE PACKETS IS FINE.. CAN'T HELP THAT. NOT OUR FAULT. 1ST PACKET AFTER BRINGING UP INTERFACE: $C0 $80 2ND PACKET: $C0 $20
 
 if(FD_ISSET(master,&readfds)){
 bytes=read(master,&pbfr,sizeof(pbfr));
