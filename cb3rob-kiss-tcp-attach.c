@@ -21,6 +21,8 @@
 #include<arpa/inet.h>
 #include<fcntl.h>
 #include<linux/ax25.h>
+#include<linux/if_ether.h>
+#include<linux/if_packet.h>
 #include<linux/if_slip.h>
 #include<linux/tcp.h>
 #include<net/if.h>
@@ -41,6 +43,7 @@
 #include<unistd.h>
 
 struct sockaddr_in saddr;
+struct sockaddr_pkt saddrpkt;
 struct termios trm;
 struct timeval tv;
 struct hostent *he;
@@ -153,6 +156,20 @@ ifr.ifr_flags=IFF_UP|IFF_RUNNING;
 ioctl(fdx,SIOCSIFFLAGS,&ifr);
 close(fdx);
 
+//LINUX SEEMS TO HAVE A BUG IN THE ax0 N_KISS DRIVER THAT CAUSES THE FIRST 2 PACKETS TO HAVE TRANSMIT KISS CHANNEL 8 AND 2 RESPECTIVELY
+//REST OF THE PACKETS IS FINE.. CAN'T HELP THAT. NOT OUR FAULT. 1ST PACKET AFTER BRINGING UP INTERFACE: $C0 $80 2ND PACKET: $C0 $20
+//NOTE THAT WE CAN'T (EASILY) SET THE BYTE TO $00 OURSELVES AS THERE IS NO GUARANTEE OR NEED FOR ONE READ() TO CONTAIN ONE FRAMED PACKET
+//PROBLEM TURNED OUT TO BE SOME PACKET BANGING TEST FOR THE CRC METHOD BY THE KERNEL
+//WE'LL SWITCH IT OFF THE SAME WAY KISSPARAMS DOES HERE: SO NOW THE FIRST 2 PACKETS COMING FROM THE KISS DEVICE ARE FINE TOO.
+
+fdx=socket(PF_PACKET,SOCK_PACKET,htons(ETH_P_AX25));
+bzero(&saddrpkt,sizeof(struct sockaddr_pkt));
+saddrpkt.spkt_family=AF_UNSPEC;
+strncpy((char*)saddrpkt.spkt_device,dev,sizeof(saddrpkt.spkt_device)-1);
+saddrpkt.spkt_protocol=0;
+sendto(fdx,"\x85\x01",2,MSG_DONTWAIT,(struct sockaddr*)&saddrpkt,sizeof(struct sockaddr_pkt));
+close(fdx);
+
 //SET THE TTY TO NONBLOCK!
 fcntl(master,F_SETFL,fcntl(master,F_GETFL,0)|O_NONBLOCK);
 fcntl(slave,F_SETFL,fcntl(slave,F_GETFL,0)|O_NONBLOCK);
@@ -189,10 +206,6 @@ printf("%s SOCKET RECV: %ld BYTES:",srcbtime(0),bytes);for(n=0;n<bytes;n++)print
 if(write(master,&pbfr,bytes)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
 };//BYTES>0
 };//FDSET
-
-//LINUX SEEMS TO HAVE A BUG IN THE ax0 N_KISS DRIVER THAT CAUSES THE FIRST 2 PACKETS TO HAVE TRANSMIT KISS CHANNEL 8 AND 2 RESPECTIVELY
-//REST OF THE PACKETS IS FINE.. CAN'T HELP THAT. NOT OUR FAULT. 1ST PACKET AFTER BRINGING UP INTERFACE: $C0 $80 2ND PACKET: $C0 $20
-//NOTE THAT WE CAN'T (EASILY) SET THE BYTE TO $00 OURSELVES AS THERE IS NO GUARANTEE OR NEED FOR ONE READ() TO CONTAIN ONE FRAMED PACKET
 
 if(FD_ISSET(master,&readfds)){
 bytes=read(master,&pbfr,sizeof(pbfr));
