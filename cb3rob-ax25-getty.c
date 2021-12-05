@@ -189,6 +189,7 @@ int master;master=-1;
 void calltermclient(int signum){printf("%s CLIENT %d TRIGGERED %s\n",srcbtime(0),getpid(),(signum==SIGTERM?"SIGTERM":"SIGPIPE"));termclient(csock,master,ptychild);};
 bzero(&sigact,sizeof(struct sigaction));
 
+//TERMINATE CLIENTS NICELY... SIGPIPE IS ACTUALLY NEEDED AS SEND() ON AX.25 SEQPACKET JUST HANGS WHEN THE OTHER SIDE IS GONE FIRST
 sigact.sa_handler=calltermclient;
 sigaction(SIGTERM,&sigact,NULL);
 sigaction(SIGPIPE,&sigact,NULL);
