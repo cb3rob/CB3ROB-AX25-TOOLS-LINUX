@@ -36,6 +36,7 @@ int csock;
 char tbuf[(AX25_MTU*7)];//MORE EFFECTIVE THROUGHPUT WHEN SENDING IN BURST
 struct full_sockaddr_ax25 baddr;
 struct full_sockaddr_ax25 caddr;
+struct sigaction sigact;
 socklen_t clen;
 fd_set writefds;
 fd_set readfds;
@@ -179,16 +180,19 @@ int clientcode(){
 ssize_t bytes;
 struct termios trm;
 struct winsize wins;
+//NO CONTROL-C IN THE CHILD. JUST IN THE MAIN PROCESS
+signal(SIGINT,SIG_IGN);
 setsid();
 //NO CONTROL-C OR ANY SUCH NONSENSE BEFORE LOGIN IS FINISHED
-signal(SIGHUP,SIG_IGN);
-signal(SIGINT,SIG_IGN);
-signal(SIGQUIT,SIG_IGN);
 pid_t ptychild;ptychild=-1;
 int master;master=-1;
-void calltermclient(){printf("%s CLIENT %d SIGPIPE/SIGTERM TRIGGERED\n",srcbtime(0),getpid());termclient(csock,master,ptychild);};
-signal(SIGPIPE,calltermclient);
-signal(SIGTERM,calltermclient);
+void calltermclient(int signum){printf("%s CLIENT %d TRIGGERED %s\n",srcbtime(0),getpid(),(signum==SIGTERM?"SIGTERM":"SIGPIPE"));termclient(csock,master,ptychild);};
+bzero(&sigact,sizeof(struct sigaction));
+
+sigact.sa_handler=calltermclient;
+sigaction(SIGTERM,&sigact,NULL);
+sigaction(SIGPIPE,&sigact,NULL);
+
 fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK);
 printf("%s CLIENT %d CONNECTED\n",srcbtime(0),getpid());
 printf("%s CLIENT %d SOCKET: %d\n",srcbtime(0),getpid(),csock);
@@ -277,6 +281,9 @@ int main(int argc,char **argv){
 if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
 
 if(argc<2){printf("USAGE: %s <SERVICE-CALLSIGN-SSID> [INTERFACE-CALLSIGN]\n\nIF THE PROCESS IS TO LISTEN ON A (VIRTUAL) CALLSIGN OTHER THAN ONE OF AN INTERFACE SPECIFY THE INTERFACE AS WELL\n",argv[0]);exit(EXIT_FAILURE);};
+
+signal(SIGHUP,SIG_IGN);
+signal(SIGQUIT,SIG_IGN);
 
 bsock=-1;setupsock(argv[1],argv[2]);
 

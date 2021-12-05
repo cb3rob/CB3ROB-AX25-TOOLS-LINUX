@@ -50,6 +50,8 @@
 
 struct sockaddr_ll ssockaddrll;
 struct sockaddr_ll dsockaddrll;
+struct sigaction sigact;
+
 socklen_t clen;
 
 int portcount;
@@ -76,7 +78,7 @@ return(a);
 };//DISPLAYCALL
 
 //SIGNALHANDLER HUP
-void requestreload(){needreload=1;};
+void requestreload(int signum){needreload=1;};
 
 void getinterfaces(){
 portcount=0;
@@ -131,7 +133,9 @@ if((sock=socket(PF_PACKET,SOCK_RAW,htons(ETH_P_AX25)))==-1){perror("SOCKET");exi
 //true=1;
 //setsockopt(sock,SOL_PACKET,PACKET_RECV_OUTPUT,(char*)&true,sizeof(int));
 
-signal(SIGHUP,requestreload);
+bzero(&sigact,sizeof(struct sigaction));
+sigact.sa_handler=requestreload;
+sigaction(SIGHUP,&sigact,NULL);
 
 //FORCE RELOAD FOR STARTUP
 needreload=1;
