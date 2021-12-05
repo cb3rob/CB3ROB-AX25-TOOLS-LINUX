@@ -56,7 +56,7 @@ static char rcbt[22];
 struct tm *ts;
 if(!t)t=time(NULL);
 ts=gmtime(&t);
-bzero(&rcbt,sizeof(rcbt));
+memset(&rcbt,0,sizeof(rcbt));
 snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,ts->tm_mon+1,ts->tm_mday,ts->tm_hour,ts->tm_min,ts->tm_sec);
 return(rcbt);
 };//SRCBTIME
@@ -69,13 +69,13 @@ printf("\n");
 };//PRINTPACKET
 
 void wipe(uint64_t slot){
-bzero(&cl[slot].kiss,sizeof(struct packet));
+memset(&cl[slot].kiss,0,sizeof(struct packet));
 };//WIPE
 
 void disconnect(uint64_t slot){
 printf("%s DISCONNECTED SLOT: %lu SOURCE: %d\n",srcbtime(0),slot,cl[slot].fd);
 close(cl[slot].fd);
-bzero(&cl[slot],sizeof(struct clients));
+memset(&cl[slot],0,sizeof(struct clients));
 cl[slot].fd=-1;
 };//DISCONNECT
 
@@ -116,7 +116,7 @@ size_t n;
 uint64_t slot;
 int active;
 //ZERO CLIENTS TABLE
-bzero(&cl,sizeof(cl));
+memset(&cl,0,sizeof(cl));
 //SET ALL FILEDESCRIPTORS TO -1
 for(slot=0;slot<MAXCLIENTS;slot++)cl[slot].fd=-1;
 FD_ZERO(&readfds);

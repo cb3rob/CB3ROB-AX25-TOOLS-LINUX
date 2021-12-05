@@ -53,7 +53,7 @@ static char rcbt[22];
 struct tm *ts;
 if(!t)t=time(NULL);
 ts=gmtime(&t);
-bzero(&rcbt,sizeof(rcbt));
+memset(&rcbt,0,sizeof(rcbt));
 snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,ts->tm_mon+1,ts->tm_mday,ts->tm_hour,ts->tm_min,ts->tm_sec);
 return(rcbt);
 };//SRCBTIME
@@ -146,7 +146,7 @@ if(bsock!=-1)close(bsock);
 bsock=socket(PF_AX25,SOCK_SEQPACKET|SOCK_NONBLOCK,0);
 if(bsock==-1)continue;
 printf("MAIN SOCKET: %d\n",bsock);
-bzero(&baddr,sizeof(struct full_sockaddr_ax25));
+memset(&baddr,0,sizeof(struct full_sockaddr_ax25));
 baddr.fsa_ax25.sax25_family=AF_AX25;
 if(calltobin(service,&baddr.fsa_ax25.sax25_call)==-1){printf("INVALID SERVICE-CALLSIGN: %s!\n",service);exit(EXIT_FAILURE);};
 addresstoascii(&baddr.fsa_ax25.sax25_call,destcall);
@@ -167,7 +167,7 @@ break;
 
 void termclient(int csock,int master,pid_t ptychild){
 printf("%s CLIENT %d TERMINATING\n",srcbtime(0),getpid());
-bzero(&tbuf,sizeof(tbuf));
+memset(&tbuf,0,sizeof(tbuf));
 if(csock!=-1){printf("%s CLIENT %d CLOSING SOCKET %d\n",srcbtime(0),getpid(),csock);close(csock);csock=-1;};
 if(master!=-1){printf("%s CLIENT %d CLOSING MASTER %d\n",srcbtime(0),getpid(),master);close(master);master=-1;};
 if(ptychild!=-1){printf("%s CLIENT %d KILLING LOGIN %d\n",srcbtime(0),getpid(),ptychild);kill(ptychild,SIGTERM);sleep(10);kill(ptychild,SIGKILL);ptychild=-1;};
@@ -187,7 +187,7 @@ setsid();
 pid_t ptychild;ptychild=-1;
 int master;master=-1;
 void calltermclient(int signum){printf("%s CLIENT %d TRIGGERED %s\n",srcbtime(0),getpid(),(signum==SIGTERM?"SIGTERM":"SIGPIPE"));termclient(csock,master,ptychild);};
-bzero(&sigact,sizeof(struct sigaction));
+memset(&sigact,0,sizeof(struct sigaction));
 
 //TERMINATE CLIENTS NICELY... SIGPIPE IS ACTUALLY NEEDED AS SEND() ON AX.25 SEQPACKET JUST HANGS WHEN THE OTHER SIDE IS GONE FIRST
 sigact.sa_handler=calltermclient;
@@ -197,12 +197,12 @@ sigaction(SIGPIPE,&sigact,NULL);
 fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK);
 printf("%s CLIENT %d CONNECTED\n",srcbtime(0),getpid());
 printf("%s CLIENT %d SOCKET: %d\n",srcbtime(0),getpid(),csock);
-bzero(&tbuf,sizeof(tbuf));
+memset(&tbuf,0,sizeof(tbuf));
 addresstoascii(&caddr.fsa_ax25.sax25_call,sourcecall);
 snprintf(tbuf,sizeof(tbuf)-1,"%s %s -> %s\r\r",srcbtime(0),sourcecall,destcall);
 if(sendclient(tbuf,0)<0)termclient(csock,master,ptychild);
-bzero(&tbuf,sizeof(tbuf));
-bzero(&trm,sizeof(struct termios));
+memset(&tbuf,0,sizeof(tbuf));
+memset(&trm,0,sizeof(struct termios));
 //SET SOME BASIC TERMIOS STUFF TO AT LEAST GET CRNL - TERMIOS DOESN'T SEEM TO DO JUST CARRIAGE RETURN ONLY
 //PACKET RADIO PROGRAMS PREFER CARRIAGE RETURN ONLY BUT WILL IGNORE NEWLINE (OR SHOULD).
 //FILE TRANSFER PROGRAMS DEMAND 8 BIT TRANSPARENCY.
@@ -210,7 +210,7 @@ bzero(&trm,sizeof(struct termios));
 cfmakeraw(&trm);
 trm.c_iflag|=ICRNL;
 trm.c_oflag|=ONLCR|OPOST;
-bzero(&wins,sizeof(struct winsize));
+memset(&wins,0,sizeof(struct winsize));
 wins.ws_row=24;
 wins.ws_col=80;
 ptychild=forkpty(&master,NULL,&trm,&wins);

@@ -84,7 +84,7 @@ void getinterfaces(){
 portcount=0;
 struct ifaddrs *ifaddr, *ifa;
 struct ifreq ifr;
-bzero(&myinterfaces,sizeof(myinterfaces));
+memset(&myinterfaces,0,sizeof(myinterfaces));
 printf("SCANNING AX.25 INTERFACES\n");
 //GETIFADDRS WORKS WITHOUT IP
 if(getifaddrs(&ifaddr)==-1){perror("GETIFADDRS");exit(EXIT_FAILURE);};
@@ -133,7 +133,7 @@ if((sock=socket(PF_PACKET,SOCK_RAW,htons(ETH_P_AX25)))==-1){perror("SOCKET");exi
 //true=1;
 //setsockopt(sock,SOL_PACKET,PACKET_RECV_OUTPUT,(char*)&true,sizeof(int));
 
-bzero(&sigact,sizeof(struct sigaction));
+memset(&sigact,0,sizeof(struct sigaction));
 sigact.sa_handler=requestreload;
 sigaction(SIGHUP,&sigact,NULL);
 
@@ -142,15 +142,15 @@ needreload=1;
 
 fcntl(sock,F_SETFL,fcntl(sock,F_GETFL,0)|O_NONBLOCK);
 
-bzero(&dsockaddrll,sizeof(struct sockaddr_ll));
+memset(&dsockaddrll,0,sizeof(struct sockaddr_ll));
 
 FD_ZERO(&readfds);
 while(1){
 while(needreload==1)getinterfaces();
 if(portcount<2)needreload=1;
 
-bzero(&buf,sizeof(buf));
-bzero(&ssockaddrll,sizeof(struct sockaddr_ll));
+memset(&buf,0,sizeof(buf));
+memset(&ssockaddrll,0,sizeof(struct sockaddr_ll));
 
 tv.tv_sec=10;
 tv.tv_usec=0;

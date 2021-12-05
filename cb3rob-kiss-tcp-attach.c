@@ -69,7 +69,7 @@ static char rcbt[22];
 struct tm *ts;
 if(!t)t=time(NULL);
 ts=gmtime(&t);
-bzero(&rcbt,sizeof(rcbt));
+memset(&rcbt,0,sizeof(rcbt));
 snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,ts->tm_mon+1,ts->tm_mday,ts->tm_hour,ts->tm_min,ts->tm_sec);
 return(rcbt);
 };//SRCBTIME
@@ -115,7 +115,7 @@ printf("%s CONNECTED: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr
 };//WHILE SOCK -1
 //GET RID OF OLD PACKETS COLLECTED IN PTY BEFORE COMPLETING TCP(RE-)CONNECT
 if(master!=-1)while((bytes=read(master,&pbfr,sizeof(pbfr)))>0)printf("%s FLUSHED: %ld BYTES FROM MASTER\n",srcbtime(0),bytes);//IF MASTER
-bzero(&pbfr,sizeof(pbfr));
+memset(&pbfr,0,sizeof(pbfr));
 bytes=0;
 };//TCPCONNECT
 
@@ -131,7 +131,7 @@ if(calltobin(argv[1],&call)<1){printf("INVALID DEVICE CALLSIGN: %s\n",argv[1]);e
 master=-1;
 slave=-1;
 
-bzero(&trm,sizeof(struct termios));
+memset(&trm,0,sizeof(struct termios));
 cfmakeraw(&trm);
 trm.c_cflag|=CREAD;
 if(openpty(&master,&slave,NULL,&trm,NULL)){printf("%s UNABLE TO CREATE PTY PAIR\n",srcbtime(0));exit(EXIT_FAILURE);};
@@ -149,7 +149,7 @@ encap=SL_MODE_KISS;
 if(ioctl(slave,SIOCSIFENCAP,&encap)){printf("%s UNABLE TO SET ENCAPSULATION SLIP MODE KISS ON PTY %s NETWORK DEVICE %s\n",srcbtime(0),ttyname(slave),dev);exit(EXIT_FAILURE);};
 
 //SET AX.25 NETWORK DEVICE FLAGS
-bzero(&ifr,sizeof(struct ifreq));
+memset(&ifr,0,sizeof(struct ifreq));
 strncpy(ifr.ifr_name,dev,sizeof(ifr.ifr_name)-1);
 ifr.ifr_mtu=AX25_MTU;
 if(ioctl(fdx,SIOCSIFMTU,&ifr)){printf("%s UNABLE TO SET MTU %d ON NETWORK DEVICE %s\n",srcbtime(0),AX25_MTU,dev);exit(EXIT_FAILURE);};
@@ -162,7 +162,7 @@ if(ioctl(fdx,SIOCSIFFLAGS,&ifr)){printf("%s UNABLE TO BRING UP NETWORK DEVICE %s
 //WE'LL SWITCH IT OFF THE SAME WAY KISSPARAMS DOES HERE: SO NOW THE FIRST 2 PACKETS COMING FROM THE KISS DEVICE ARE FINE TOO.
 //THE INTERFACE MUST ALREADY BE UP TO DO THIS. NOT TO WORRY. WE'LL FLUSH ANYTHING THAT CAME IN BEFORE FINISHING SETTING UP THE TCP SOCKET ANYWAY.
 if(ioctl(fdx,SIOCGIFINDEX,&ifr)){printf("%s UNABLE TO GET INTERFACE INDEX FOR NETWORK DEVICE %s\n",srcbtime(0),dev);exit(EXIT_FAILURE);};
-bzero(&saddrll,sizeof(struct sockaddr_ll));
+memset(&saddrll,0,sizeof(struct sockaddr_ll));
 saddrll.sll_family=AF_PACKET;
 saddrll.sll_protocol=htons(ETH_P_AX25);
 saddrll.sll_ifindex=ifr.ifr_ifindex;
