@@ -43,7 +43,7 @@
 #include<unistd.h>
 
 struct sockaddr_in saddr;
-struct sockaddr_pkt saddrpkt;
+struct sockaddr_ll saddrll;
 struct termios trm;
 struct timeval tv;
 struct hostent *he;
@@ -134,40 +134,39 @@ slave=-1;
 bzero(&trm,sizeof(struct termios));
 cfmakeraw(&trm);
 trm.c_cflag|=CREAD;
-openpty(&master,&slave,NULL,&trm,NULL);
+if(openpty(&master,&slave,NULL,&trm,NULL)){printf("%s UNABLE TO CREATE PTY PAIR\n",srcbtime(0));exit(EXIT_FAILURE);};
 printf("%s TTYNAME MASTER: %s\n",srcbtime(0),ttyname(master));
 printf("%s TTYNAME SLAVE: %s\n",srcbtime(0),ttyname(slave));
 
 //MAKE SLAVE PTY AX.25 NETWORK DEVICE
+fdx=socket(PF_PACKET,SOCK_DGRAM,htons(ETH_P_AX25));
+if(fdx==-1){printf("%s PACKET SOCKET NEEDED TO SETUP PTY %s NOT SUPPORTED\n",srcbtime(0),ttyname(slave));exit(EXIT_FAILURE);};
 disc=N_AX25;
-ioctl(slave,TIOCSETD,&disc);
-ioctl(slave,SIOCGIFNAME,&dev);
-ioctl(slave,SIOCSIFHWADDR,&call);
+if(ioctl(slave,TIOCSETD,&disc)){printf("%s UNABLE TO SET LINE DICIPLINE N_AX25 ON PTY %s\n",srcbtime(0),ttyname(slave));exit(EXIT_FAILURE);};
+if(ioctl(slave,SIOCGIFNAME,&dev)){printf("%s UNABLE TO GET NETWORK DEVICE NAME FOR PTY %s\n",srcbtime(0),ttyname(slave));exit(EXIT_FAILURE);};
+if(ioctl(slave,SIOCSIFHWADDR,&call)){printf("%s UNABLE TO SET CALLSIGN ON PTY %s NETWORK DEVICE %s\n",srcbtime(0),ttyname(slave),dev);exit(EXIT_FAILURE);};
 encap=SL_MODE_KISS;
-ioctl(slave,SIOCSIFENCAP,&encap);
+if(ioctl(slave,SIOCSIFENCAP,&encap)){printf("%s UNABLE TO SET ENCAPSULATION SLIP MODE KISS ON PTY %s NETWORK DEVICE %s\n",srcbtime(0),ttyname(slave),dev);exit(EXIT_FAILURE);};
 
 //SET AX.25 NETWORK DEVICE FLAGS
-fdx=socket(PF_AX25,SOCK_DGRAM,0);
 bzero(&ifr,sizeof(struct ifreq));
-strcpy(ifr.ifr_name,dev);
-ifr.ifr_mtu=256;
-ioctl(fdx,SIOCSIFMTU,&ifr);
+strncpy(ifr.ifr_name,dev,sizeof(ifr.ifr_name)-1);
+ifr.ifr_mtu=AX25_MTU;
+if(ioctl(fdx,SIOCSIFMTU,&ifr)){printf("%s UNABLE TO SET MTU %d ON NETWORK DEVICE %s\n",srcbtime(0),AX25_MTU,dev);exit(EXIT_FAILURE);};
 ifr.ifr_flags=IFF_UP|IFF_RUNNING;
-ioctl(fdx,SIOCSIFFLAGS,&ifr);
-close(fdx);
-
+if(ioctl(fdx,SIOCSIFFLAGS,&ifr)){printf("%s UNABLE TO BRING UP NETWORK DEVICE %s\n",srcbtime(0),dev);exit(EXIT_FAILURE);};
 //LINUX SEEMS TO HAVE A BUG IN THE ax0 N_KISS DRIVER THAT CAUSES THE FIRST 2 PACKETS TO HAVE TRANSMIT KISS CHANNEL 8 AND 2 RESPECTIVELY
 //REST OF THE PACKETS IS FINE.. CAN'T HELP THAT. NOT OUR FAULT. 1ST PACKET AFTER BRINGING UP INTERFACE: $C0 $80 2ND PACKET: $C0 $20
 //NOTE THAT WE CAN'T (EASILY) SET THE BYTE TO $00 OURSELVES AS THERE IS NO GUARANTEE OR NEED FOR ONE READ() TO CONTAIN ONE FRAMED PACKET
 //PROBLEM TURNED OUT TO BE SOME PACKET BANGING TEST FOR THE CRC METHOD BY THE KERNEL
 //WE'LL SWITCH IT OFF THE SAME WAY KISSPARAMS DOES HERE: SO NOW THE FIRST 2 PACKETS COMING FROM THE KISS DEVICE ARE FINE TOO.
+if(ioctl(fdx,SIOCGIFINDEX,&ifr)){printf("%s UNABLE TO GET INTERFACE INDEX FOR NETWORK DEVICE %s\n",srcbtime(0),dev);exit(EXIT_FAILURE);};
+bzero(&saddrll,sizeof(struct sockaddr_ll));
+saddrll.sll_family=AF_PACKET;
+saddrll.sll_protocol=htons(ETH_P_AX25);
+saddrll.sll_ifindex=ifr.ifr_ifindex;
+if(sendto(fdx,"\x85\x01",2,MSG_DONTWAIT,(struct sockaddr*)&saddrll,sizeof(struct sockaddr_ll))!=2){printf("%s UNABLE TO SEND SET CRC MODE COMMAND TO INTERFACE %s\n",srcbtime(0),dev);exit(EXIT_FAILURE);};
 
-fdx=socket(PF_PACKET,SOCK_PACKET,htons(ETH_P_AX25));
-bzero(&saddrpkt,sizeof(struct sockaddr_pkt));
-saddrpkt.spkt_family=AF_UNSPEC;
-strncpy((char*)saddrpkt.spkt_device,dev,sizeof(saddrpkt.spkt_device)-1);
-saddrpkt.spkt_protocol=0;
-sendto(fdx,"\x85\x01",2,MSG_DONTWAIT,(struct sockaddr*)&saddrpkt,sizeof(struct sockaddr_pkt));
 close(fdx);
 
 //SET THE TTY TO NONBLOCK!
