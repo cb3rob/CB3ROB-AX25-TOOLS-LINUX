@@ -184,7 +184,7 @@ printf("====================\n");
 printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),displaycall(pctr));
 pctr+=AXALEN;
 //SRC ADDR
-printf("%s FROM: %s SIZE: %ld\n",srcbtime(0),displaycall(pctr),bytes);
+printf("FROM: %s SIZE: %ld\n",displaycall(pctr),bytes);
 
 dsockaddrll.sll_family=ssockaddrll.sll_family;
 dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
