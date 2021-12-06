@@ -315,7 +315,6 @@ printf("%s AX.25 BOUND TO DEVICE %s\n",srcbtime(0),dev);
 
 //LOOP DATA
 ssize_t bytes;
-int n;
 
 FD_ZERO(&readfds);
 FD_ZERO(&writefds);

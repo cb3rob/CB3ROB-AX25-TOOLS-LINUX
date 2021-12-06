@@ -43,6 +43,7 @@
 #include<unistd.h>
 #include<signal.h>
 #include<stdint.h>
+#include<time.h>
 
 #define MAX_PORTS 32
 #define PACKET_SIZE 1500
@@ -69,6 +70,16 @@ char asciicall[10];
 
 struct interfaces myinterfaces[MAX_PORTS];
 
+char *srcbtime(time_t t){
+static char rcbt[22];
+struct tm *ts;
+if(!t)t=time(NULL);
+ts=gmtime(&t);
+memset(&rcbt,0,sizeof(rcbt));
+snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,ts->tm_mon+1,ts->tm_mday,ts->tm_hour,ts->tm_min,ts->tm_sec);
+return(rcbt);
+};//SRCBTIME
+
 char *displaycall(uint8_t *c){
 static char a[10];
 int n;
@@ -85,7 +96,7 @@ portcount=0;
 struct ifaddrs *ifaddr, *ifa;
 struct ifreq ifr;
 memset(&myinterfaces,0,sizeof(myinterfaces));
-printf("SCANNING AX.25 INTERFACES\n");
+printf("%s SCANNING AX.25 INTERFACES\n",srcbtime(0));
 //GETIFADDRS WORKS WITHOUT IP
 if(getifaddrs(&ifaddr)==-1){perror("GETIFADDRS");exit(EXIT_FAILURE);};
 for(ifa=ifaddr;(ifa!=NULL&&portcount<MAX_PORTS);ifa=ifa->ifa_next){
@@ -103,14 +114,14 @@ if(ioctl(sock,SIOCGIFFLAGS,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 myinterfaces[portcount].status=ifr.ifr_flags;
 if(ioctl(sock,SIOCGIFINDEX,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 myinterfaces[portcount].ifindex=ifr.ifr_ifindex;
-printf("FOUND AX.25 PORT %d: %d %s %s STATUS: %s\n",portcount,myinterfaces[portcount].ifindex,myinterfaces[portcount].ifname,myinterfaces[portcount].asciicall,((myinterfaces[portcount].status&(IFF_UP|IFF_RUNNING))?"UP":"DOWN"));
+printf("%s FOUND AX.25 PORT %d: %d %s %s STATUS: %s\n",srcbtime(0),portcount,myinterfaces[portcount].ifindex,myinterfaces[portcount].ifname,myinterfaces[portcount].asciicall,((myinterfaces[portcount].status&(IFF_UP|IFF_RUNNING))?"UP":"DOWN"));
 portcount++;
 };//IF AX.25
 };//FOR INTERFACES
 freeifaddrs(ifaddr);
 needreload=0;
-printf("DONE SCANNING INTERFACES\n");
-if(portcount<2){printf("INSUFFICIENT (%d) AX.25 PORTS FOR BRIDGING\n",portcount);needreload=1;sleep(5);};//INSUFFICIENT
+printf("%s DONE SCANNING INTERFACES\n",srcbtime(0));
+if(portcount<2){printf("%s INSUFFICIENT (%d) AX.25 PORTS FOR BRIDGING\n",srcbtime(0),portcount);needreload=1;sleep(5);};//INSUFFICIENT
 };//GETINTERFACES
 
 int main(void){
@@ -170,10 +181,10 @@ if(ssockaddrll.sll_family!=AF_PACKET)continue;
 if(ssockaddrll.sll_hatype!=ARPHRD_AX25)continue;
 
 printf("============================================\n");
-printf("INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),displaycall(pctr));
+printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),displaycall(pctr));
 pctr+=AXALEN;
 //SRC ADDR
-printf("FROM: %s SIZE: %ld\n",displaycall(pctr),bytes);
+printf("%s FROM: %s SIZE: %ld\n",srcbtime(0),displaycall(pctr),bytes);
 
 dsockaddrll.sll_family=ssockaddrll.sll_family;
 dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
@@ -185,7 +196,7 @@ if(myinterfaces[po].ifindex==ssockaddrll.sll_ifindex)continue;
 //NOT BRIDGING TO INTERFACES THAT ARE NOT UP
 if(!(myinterfaces[po].status&(IFF_UP|IFF_RUNNING))){needreload=1;continue;};
 //ALL FINE, FORWARD PACKET
-printf("FORWARDING PACKET OVER INTERFACE %s (%d) TO %s\n",myinterfaces[po].ifname,myinterfaces[po].ifindex,displaycall(buf+1));
+printf("%s FORWARDING PACKET OVER INTERFACE %s (%d) TO %s\n",srcbtime(0),myinterfaces[po].ifname,myinterfaces[po].ifindex,displaycall(buf+1));
 
 dsockaddrll.sll_ifindex=myinterfaces[po].ifindex;
 
