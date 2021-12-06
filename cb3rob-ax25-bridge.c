@@ -93,7 +93,7 @@ void requestreload(int signum){needreload=1;};
 
 void getinterfaces(){
 portcount=0;
-struct ifaddrs *ifaddr, *ifa;
+struct ifaddrs *ifaddr,*ifa;
 struct ifreq ifr;
 memset(&myinterfaces,0,sizeof(myinterfaces));
 printf("%s SCANNING AX.25 INTERFACES\n",srcbtime(0));
@@ -180,7 +180,7 @@ if(ssockaddrll.sll_protocol!=htons(ETH_P_AX25))continue;
 if(ssockaddrll.sll_family!=AF_PACKET)continue;
 if(ssockaddrll.sll_hatype!=ARPHRD_AX25)continue;
 
-printf("============================================\n");
+printf("====================\n");
 printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),displaycall(pctr));
 pctr+=AXALEN;
 //SRC ADDR
