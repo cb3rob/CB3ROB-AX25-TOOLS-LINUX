@@ -22,5 +22,10 @@ chmod 710 cb3rob-ax25-bridge
 chmod 710 cb3rob-ax25-getty
 chmod 710 cb3rob-kiss-tcp-attach
 chmod 710 cb3rob-kiss-tcp-multiplexer
+killall -9 cb3rob-ax25-bbs
+killall -9 cb3rob-ax25-bridge
+killall -9 cb3rob-ax25-getty
+killall -9 cb3rob-kiss-tcp-attach
+killall -9 cb3rob-kiss-tcp-multiplexer
 cp -v cb3rob-ax25-bbs cb3rob-ax25-bridge cb3rob-ax25-getty cb3rob-kiss-tcp-attach cb3rob-axudp-attach cb3rob-kiss-tcp-multiplexer /usr/sbin
 
