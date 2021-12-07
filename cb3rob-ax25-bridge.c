@@ -70,9 +70,9 @@ char asciicall[10];
 
 struct interfaces myinterfaces[MAX_PORTS];
 
-char *srcbtime(time_t t){
+char*srcbtime(time_t t){
 static char rcbt[22];
-struct tm *ts;
+struct tm*ts;
 if(!t)t=time(NULL);
 ts=gmtime(&t);
 memset(&rcbt,0,sizeof(rcbt));
@@ -80,7 +80,7 @@ snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,t
 return(rcbt);
 };//SRCBTIME
 
-char *displaycall(uint8_t *c){
+char*displaycall(uint8_t*c){
 static char a[10];
 int n;
 for(n=0;(n<6)&&(c[n]!=0x40);n++)a[n]=(c[n]>>1);
@@ -93,7 +93,7 @@ void requestreload(int signum){needreload=1;};
 
 void getinterfaces(){
 portcount=0;
-struct ifaddrs *ifaddr,*ifa;
+struct ifaddrs*ifaddr,*ifa;
 struct ifreq ifr;
 memset(&myinterfaces,0,sizeof(myinterfaces));
 printf("%s SCANNING AX.25 INTERFACES\n",srcbtime(0));
@@ -128,7 +128,7 @@ int main(void){
 ssize_t bytes;
 int po;
 
-uint8_t *pctr;
+uint8_t*pctr;
 uint8_t buf[PACKET_SIZE];
 
 fd_set readfds;

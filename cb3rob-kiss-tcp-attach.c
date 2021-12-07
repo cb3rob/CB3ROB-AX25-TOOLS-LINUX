@@ -46,7 +46,7 @@ struct sockaddr_in saddr;
 struct sockaddr_ll saddrll;
 struct termios trm;
 struct timeval tv;
-struct hostent *he;
+struct hostent*he;
 int sock;
 int disc;
 char dev[IFNAMSIZ];
@@ -64,9 +64,9 @@ fd_set writefds;
 fd_set exceptfds;
 ax25_address call;
 
-char *srcbtime(time_t t){
+char*srcbtime(time_t t){
 static char rcbt[22];
-struct tm *ts;
+struct tm*ts;
 if(!t)t=time(NULL);
 ts=gmtime(&t);
 memset(&rcbt,0,sizeof(rcbt));
@@ -74,7 +74,7 @@ snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,t
 return(rcbt);
 };//SRCBTIME
 
-int calltobin(char *ascii,ax25_address *bin){
+int calltobin(char*ascii,ax25_address*bin){
 int n;
 if(ascii==NULL)return(-1);
 if(bin==NULL)return(-1);
@@ -119,7 +119,7 @@ memset(&pbfr,0,sizeof(pbfr));
 bytes=0;
 };//TCPCONNECT
 
-int main(int argc,char **argv){
+int main(int argc,char**argv){
 
 if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
 

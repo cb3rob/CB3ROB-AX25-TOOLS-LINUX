@@ -78,7 +78,7 @@ struct sockaddr_in saddr;
 struct sockaddr_in baddr;//BIND ADDRESS BECAUSE AX25IPD IS TOO STUPID TO MAINTAIN A DYNAMIC LIST OF LAST HEARD SOURCEIPS:PORTS FOR EACH 'CONNECTION' AND THAT'S THE ONLY PIECE OF DUNG WE CAN TEST THIS AGAINST.
 //WE SIMPLY BIND TO WHATEVER PORT THE SERVER IS ON TOO (AS PER ARGV) - TAKE NOTE THAT THIS SHOULD NOT BE AN ISSUE AS STUFF LIKE AX25IPD SHOULD JUST DYNAMICALLY KEEP TRACK OF PEERS
 struct timeval tv;
-struct hostent *he;
+struct hostent*he;
 int sock;
 int tap;
 int devno;
@@ -108,29 +108,19 @@ struct bpqethhdr tappacket;
 
 //SOME RIPPED STUFF TO GET THE CRC TO WORK. DON'T ASK.
 
-/* crc.c Computations involving CRCs */
+//crc.c Computations involving CRCs
 
-/*
-**********************************************************************
-* The following code was taken from Appendix B of RFC 1171
-* (Point-to-Point Protocol)
-*
-* The RFC credits the following sources for this implementation:
-*
-* Perez, "Byte-wise CRC Calculations", IEEE Micro, June, 1983.
-*
-* Morse, G., "Calculating CRC's by Bits and Bytes", Byte,
-* September 1986.
-*
-* LeVan, J., "A Fast CRC", Byte, November 1987.
-*
-*
-* The HDLC polynomial: x**0 + x**5 + x**12 + x**16
-*/
+//The following code was taken from Appendix B of RFC 1171
+//(Point-to-Point Protocol)
+//The RFC credits the following sources for this implementation:
+//Perez, "Byte-wise CRC Calculations", IEEE Micro, June, 1983.
+//Morse, G., "Calculating CRC's by Bits and Bytes", Byte,
+//September 1986.
+//LeVan, J., "A Fast CRC", Byte, November 1987.
+//The HDLC polynomial: x**0 + x**5 + x**12 + x**16
 
-/*
-* FCS lookup table as calculated by the table generator in section 2.
-*/
+//FCS lookup table as calculated by the table generator in section 2.
+
 static uint16_t fcstab[256]={
 0x0000,0x1189,0x2312,0x329B,0x4624,0x57AD,0x6536,0x74BF,
 0x8C48,0x9DC1,0xAF5A,0xBED3,0xCA6C,0xDBE5,0xE97E,0xF8F7,
@@ -165,46 +155,40 @@ static uint16_t fcstab[256]={
 0xF78F,0xE606,0xD49D,0xC514,0xB1AB,0xA022,0x92B9,0x8330,
 0x7BC7,0x6A4E,0x58D5,0x495C,0x3DE3,0x2C6A,0x1EF1,0x0F78};
 
-#define PPPINITFCS 0xFFFF /* Initial FCS value */
-#define PPPGOODFCS 0xF0B8 /* Good final FCS value */
+#define PPPINITFCS 0xFFFF //Initial FCS value
+#define PPPGOODFCS 0xF0B8 //Good final FCS value
 
-/*
-* Calculate a new fcs given the current fcs and the new data.
-*/
-uint16_t pppfcs(uint16_t fcs,unsigned char *cp,int len)
+//Calculate a new fcs given the current fcs and the new data.
+
+uint16_t pppfcs(uint16_t fcs,unsigned char*cp,int len)
 {
-/* ASSERT(sizeof (uint16_t) == 2); */
-/* ASSERT(((uint16_t) -1) > 0); */
-while (len--)fcs = (fcs >> 8) ^ fcstab[(fcs ^ *cp++) & 0xFF];
+//ASSERT(sizeof (uint16_t) == 2);
+//ASSERT(((uint16_t) -1) > 0);
+while(len--)fcs=(fcs >> 8)^fcstab[(fcs^*cp++)&0xFF];
 return fcs;
-}
+};
 
-/*
-* End code from Appendix B of RFC 1171
-**********************************************************************
-*/
+//End code from Appendix B of RFC 1171
 
-/*
-* The following routines are simply convenience routines...
-* I'll merge them into the mainline code when suitably debugged
-*/
+//The following routines are simply convenience routines...
+//I'll merge them into the mainline code when suitably debugged
 
-/* Return the computed CRC */
-unsigned short int compute_crc(unsigned char *buf,int l){
+//Return the computed CRC
+unsigned short int compute_crc(unsigned char*buf,int l){
 int fcs;
-fcs = PPPINITFCS;
-fcs = pppfcs(fcs,buf,l);
-fcs ^= 0xFFFF;
+fcs=PPPINITFCS;
+fcs=pppfcs(fcs,buf,l);
+fcs^=0xFFFF;
 return fcs;
-}
+};
 
-/* Return true if the CRC is correct */
-int ok_crc(unsigned char *buf,int l){
+//Return true if the CRC is correct
+int ok_crc(unsigned char*buf,int l){
 int fcs;
-fcs = PPPINITFCS;
-fcs = pppfcs(fcs,buf,l);
-return fcs == PPPGOODFCS;
-}
+fcs=PPPINITFCS;
+fcs=pppfcs(fcs,buf,l);
+return fcs==PPPGOODFCS;
+};
 
 int tapalloc(char*tdev,char*callsign,int devno){
 if(tap!=-1)close(tap);
@@ -248,9 +232,9 @@ system("killall -HUP cb3rob-ax25-bridge");
 return(tap);
 };//TAPALLOC
 
-char *srcbtime(time_t t){
+char*srcbtime(time_t t){
 static char rcbt[22];
-struct tm *ts;
+struct tm*ts;
 if(!t)t=time(NULL);
 ts=gmtime(&t);
 memset(&rcbt,0,sizeof(rcbt));
@@ -258,7 +242,7 @@ snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,t
 return(rcbt);
 };//SRCBTIME
 
-int calltobin(char *ascii,ax25_address *bin){
+int calltobin(char*ascii,ax25_address*bin){
 int n;
 if(ascii==NULL)return(-1);
 if(bin==NULL)return(-1);
@@ -301,7 +285,7 @@ printf("%s CONNECTED: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr
 };//WHILE SOCK -1
 };//UDPCONNECT
 
-int main(int argc,char **argv){
+int main(int argc,char**argv){
 
 if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
 

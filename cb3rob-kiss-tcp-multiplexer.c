@@ -51,9 +51,9 @@ struct packet kiss;
 
 unsigned char tcppacket[1500];
 
-char *srcbtime(time_t t){
+char*srcbtime(time_t t){
 static char rcbt[22];
-struct tm *ts;
+struct tm*ts;
 if(!t)t=time(NULL);
 ts=gmtime(&t);
 memset(&rcbt,0,sizeof(rcbt));

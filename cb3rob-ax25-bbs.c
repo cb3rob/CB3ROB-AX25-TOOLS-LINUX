@@ -32,9 +32,9 @@ char destcall[10];
 char servicecall[10];
 char interfacecall[10];
 
-char *srcbtime(time_t t){
+char*srcbtime(time_t t){
 static char rcbt[22];
-struct tm *ts;
+struct tm*ts;
 if(!t)t=time(NULL);
 ts=gmtime(&t);
 memset(&rcbt,0,sizeof(rcbt));
@@ -42,12 +42,12 @@ snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,t
 return(rcbt);
 };//SRCBTIME
 
-int addresstoascii(ax25_address *bin,char *a){
+int addresstoascii(ax25_address*bin,char*a){
 unsigned char ssid;
 //unsigned char control;
 unsigned int n;
 //HAVE TO RECAST STRUCT ANONYMOUS
-uint8_t *b;
+uint8_t*b;
 b=(uint8_t*)bin;
 if((b[0]&0x01)||(b[1]&0x01)||(b[2]&0x01)||(b[3]&0x01)||(b[4]&0x01)||(b[5]&0x01))return(0);//BIT 0 is SET TO ZERO ON ALL BUT THE LAST OCTET
 //BOGUS OUT IF INVALID BEFORE HANDLING THE REST FOR SPEED OPTIMALISATION
@@ -79,7 +79,7 @@ if(ssid>0){a[n++]='-';if(ssid<10){a[n++]=0x30+ssid;}else{a[n++]=0x31;a[n++]=0x26
 return((b[6]&0x01)+1);
 };//ADDRESSTOASCII
 
-int calltobin(char *ascii,ax25_address *bin){
+int calltobin(char*ascii,ax25_address*bin){
 int n;
 if(ascii==NULL)return(-1);
 if(bin==NULL)return(-1);
@@ -96,7 +96,7 @@ if(ascii[n+1]==0x31)if((ascii[n+2]>=0x30)&&(ascii[n+2]<=0x35))if(ascii[n+3]==0){
 return(-1);
 };//CALLTOBIN
 
-void sendclient(void *data,ssize_t total){
+void sendclient(void*data,ssize_t total){
 ssize_t bytes;
 ssize_t thisblock;
 ssize_t sent;
@@ -122,7 +122,7 @@ sent+=bytes;
 };//WHILE DATA REMAINING
 };//SENDCLIENT
 
-void setupsock(char *service,char*interface){
+void setupsock(char*service,char*interface){
 while(1){
 if(bsock!=-1)close(bsock);
 bsock=socket(PF_AX25,SOCK_SEQPACKET|SOCK_NONBLOCK,0);
@@ -174,7 +174,7 @@ close(csock);
 exit(EXIT_SUCCESS);
 };//CLIENTCODE
 
-int main(int argc,char **argv){
+int main(int argc,char**argv){
 if(argc<2){printf("USAGE: %s <SERVICE-CALLSIGN-SSID> [INTERFACE-CALLSIGN]\n\nIF THE PROCESS IS TO LISTEN ON A (VIRTUAL) CALLSIGN OTHER THAN ONE OF AN INTERFACE SPECIFY THE INTERFACE AS WELL\n",argv[0]);exit(EXIT_FAILURE);};
 
 bsock=-1;setupsock(argv[1],argv[2]);
