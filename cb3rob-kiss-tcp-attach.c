@@ -175,7 +175,6 @@ fcntl(slave,F_SETFL,fcntl(slave,F_GETFL,0)|O_NONBLOCK);
 
 sock=-1;tcpconnect(argv[2],argv[3]);
 
-
 printf("%s AX.25 BOUND TO DEVICE %s\n",srcbtime(0),dev);
 
 //LOOP DATA
