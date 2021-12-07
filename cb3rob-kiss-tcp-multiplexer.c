@@ -109,7 +109,7 @@ break;
 };//WHILE 1
 };//SETUPLISTENER
 
-int main(){
+int main(int argc,char**argv){
 setuplistener();
 ssize_t bytes;
 size_t n;

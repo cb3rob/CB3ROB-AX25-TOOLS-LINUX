@@ -124,7 +124,7 @@ printf("%s DONE SCANNING INTERFACES\n",srcbtime(0));
 if(portcount<2){printf("%s INSUFFICIENT (%d) AX.25 PORTS FOR BRIDGING\n",srcbtime(0),portcount);needreload=1;sleep(5);};//INSUFFICIENT
 };//GETINTERFACES
 
-int main(void){
+int main(int argc,char**argv){
 ssize_t bytes;
 int po;
 
