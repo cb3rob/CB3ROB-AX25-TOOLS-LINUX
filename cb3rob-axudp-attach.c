@@ -286,6 +286,7 @@ printf("%s CONNECTED: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr
 };//UDPCONNECT
 
 int main(int argc,char**argv){
+int n;
 
 if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
 
@@ -325,7 +326,7 @@ FD_SET(sock,&readfds);
 nfds=sock;if(tap>sock)nfds=tap;
 tv.tv_sec=30;
 tv.tv_usec=0;
-select(nfds+1,&readfds,&writefds,&exceptfds,&tv);
+printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),select(nfds+1,&readfds,&writefds,&exceptfds,&tv));
 
 //PACKETS THAT ARRIVE FROM AXUDP SERVER
 
@@ -335,8 +336,7 @@ if(bytes<=1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);udpconnect(argv[2]
 if(bytes>=17){//2 7 BYTE ADDRESSES, 1 CONTROL BYTE, 2 BYTE FCS
 sockpacket.len=htons(bytes+3);//+5=INCLUDE FCS +3= STRIP THE FCS ON BPQETHER, ALSO BELOW
 fcs16=ntohs(compute_crc(sockpacket.payload,bytes-2));
-//printf("IN %ld BYTES:",bytes);for(n=0;n<bytes;n++)printf(" %02X",sockpacket.payload[n]);printf("\n");
-//printf("%s FCS INCOMING: %04X MSB: %02X LSB: %02X\n",srcbtime(0),fcs16,sockpacket.payload[bytes-2],sockpacket.payload[bytes-1]);
+printf("%s FCS INCOMING: %04X MSB: %02X LSB: %02X IN %ld BYTES:",srcbtime(0),fcs16,sockpacket.payload[bytes-2],sockpacket.payload[bytes-1],bytes-2);for(n=0;n<bytes;n++)printf(" %02X",sockpacket.payload[n]);printf("\n");
 if((sockpacket.payload[(bytes-2)]!=(fcs16>>8))||(sockpacket.payload[(bytes-1)]!=(fcs16&0x00FF))){printf("%s INCOMING FCS FAILED\n",srcbtime(0));continue;};
 if(write(tap,&sockpacket,bytes+14)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
 };//BYTES>=17
@@ -351,8 +351,7 @@ if(tappacket.ptype==ntohs(ETH_P_BPQ)){
 fcs16=ntohs(compute_crc(tappacket.payload,bytes-16));
 tappacket.payload[bytes-16]=(fcs16>>8);//FCS MSB
 tappacket.payload[bytes-15]=(fcs16&0x00FF);//FCS LSB
-//printf("OUT %ld BYTES:",bytes-14);for(n=0;n<bytes-14;n++)printf(" %02X",tappacket.payload[n]);printf("\n");
-//printf("%s FCS OUTGOING: %04X MSB: %02X LSB: %02X\n",srcbtime(0),fcs16,tappacket.payload[bytes-16],tappacket.payload[bytes-15]);
+printf("%s FCS OUTGOING: %04X MSB: %02X LSB: %02X OUT %ld BYTES:",srcbtime(0),fcs16,tappacket.payload[bytes-16],tappacket.payload[bytes-15],bytes-14);for(n=0;n<bytes-14;n++)printf(" %02X",tappacket.payload[n]);printf("\n");
 if(send(sock,&tappacket.payload,bytes-14,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);udpconnect(argv[2],argv[3]);};
 };//BPQ FRAME
 };//BYTES>0
