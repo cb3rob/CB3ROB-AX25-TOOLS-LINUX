@@ -66,8 +66,8 @@
 #include<time.h>
 #include<unistd.h>
 
-#include <linux/if.h>
-#include <linux/if_tun.h>
+#include<linux/if.h>
+#include<linux/if_tun.h>
 
 struct sockaddr_in saddr;
 struct sockaddr_in baddr;//BIND ADDRESS BECAUSE AX25IPD IS TOO STUPID TO MAINTAIN A DYNAMIC LIST OF LAST HEARD SOURCEIPS:PORTS FOR EACH 'CONNECTION' AND THAT'S THE ONLY PIECE OF DUNG WE CAN TEST THIS AGAINST.
