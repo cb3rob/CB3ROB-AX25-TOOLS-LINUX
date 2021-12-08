@@ -7,7 +7,7 @@
 
 //TO BRING UP AN AX.25 AXUDP INTERFACE (bpq0,bpq1,etc) TO AN AXUDP CONCENTRATOR SERVER:
 
-// ./cb3rob-axudp-attach NOCALL-15 hu1nod.packetradio.hu 93 &
+// ./cb3rob-axudp-attach NOCALL-15 hu1nod.packetradio.at 93 &
 
 #include<arpa/inet.h>
 #include<fcntl.h>
