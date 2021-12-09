@@ -7,9 +7,9 @@
 
 //ALPHA DEVELOPMENT STATUS - UNDER CONSTRUCTION - NO ASSUMPTIONS TOWARDS SECURITY
 
-//root 9254  0.0  0.0   6592   808 pts/0    S+   12:51   0:00  \_ ./cb3rob-ax25-bbs KISSMX      <--- MAIN LISTEN DAEMON
-//root 9289  0.0  0.0  15048  1832 pts/0    S+   12:52   0:00      \_ ./cb3rob-ax25-bbs KISSMX  <--- CHILD AX.25 HANDLER
-//root 9290  0.0  0.0  85036  4544 pts/4    Ss   12:52   0:00          \_ /sbin/bbs              <--- CHILD PTY HANDLER EXEC(/BIN/LOGIN)
+//root 9254  0.0  0.0   6592   808 pts/0    S+   12:51   0:00  \_ ./cb3rob-ax25-bbs KISSMX                <--- MAIN LISTEN DAEMON
+//root 9289  0.0  0.0  15048  1832 pts/0    S+   12:52   0:00      \_ ./cb3rob-ax25-bbs KISSMX            <--- CHILD AX.25 HANDLER
+//root 9290  0.0  0.0  85036  4544 pts/4    Ss   12:52   0:00          \_ /usr/sbin/cb3rob-ax25-bbs-login <--- CHILD PTY HANDLER EXEC
 
 #include<fcntl.h>
 #include<linux/ax25.h>
@@ -218,9 +218,9 @@ ptychild=forkpty(&master,slavetty,&trm,&wins);
 if(ptychild==0){
 //CHILD (LOGIN)
 close(csock);csock=-1;//DON'T WANT THAT HERE
-char*loginargv[]={"/sbin/bbs",sourcecall,destcall,NULL};
+char*loginargv[]={"/usr/sbin/cb3rob-ax25-bbs-login",sourcecall,destcall,NULL};
 char*loginenvp[]={"TERM=dumb",NULL};
-execve("/sbin/bbs",&loginargv[0],&loginenvp[0]);
+execve("/usr/sbin/cb3rob-ax25-bbs-login",&loginargv[0],&loginenvp[0]);
 exit(EXIT_SUCCESS);
 }else{
 //PARENT (DATA RELAY)

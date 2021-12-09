@@ -20,12 +20,12 @@ snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,t
 return(rcbt);
 };//SRCBTIME
 
-void printwelcome(){
-printf("TIME: %s\rCALL: %s\rUSER: %s\rNODE: %s\rLINE: %s\r",srcbtime(0),call,user,node,ttyname(0));
+void printstatus(){
+printf("TIME: %s\rCALL: %s\rUSER: %s\rNODE: %s\rLINE: %s\r\r",srcbtime(0),call,user,node,ttyname(0));
 };//PRINTWELCOME
 
-void printbanner(){
-printf("Welcome to MuTiNy BBS\r\r");
+void printwelcome(){
+printf("=====================\rWelcome to MuTiNy BBS\r=====================\r");
 };//PRINTBANNER
 
 int main(int argc,char**argv){
@@ -45,9 +45,9 @@ for(n=0;(n<sizeof(user)-1)&&(call[n])&&(call[n]!='-');n++)user[n]=call[n];
 //TURN OFF STDOUT BUFFERING TO USE PRINTF WITH CARRIAGE RETURN
 setbuf(stdout,NULL);
 
+printstatus();
 printwelcome();
 sleep(10);
-
 printf("\r\rBYE\r");
 exit(0);
 };
