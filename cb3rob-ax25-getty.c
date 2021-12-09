@@ -180,6 +180,7 @@ int clientcode(){
 ssize_t bytes;
 struct termios trm;
 struct winsize wins;
+char slavetty[256];
 //NO CONTROL-C IN THE CHILD. JUST IN THE MAIN PROCESS
 signal(SIGINT,SIG_IGN);
 signal(SIGCHLD,SIG_DFL);//CHILD DOES CARE
@@ -189,9 +190,10 @@ setpgid(0,0);
 pid_t ptychild;ptychild=-1;
 int master;master=-1;
 void calltermclient(int signum){printf("%s CLIENT %d TRIGGERED %s\n",srcbtime(0),getpid(),(signum==SIGTERM?"SIGTERM":"SIGPIPE"));termclient(csock,master,ptychild);};
-memset(&sigact,0,sizeof(struct sigaction));
 
 //TERMINATE CLIENTS NICELY... SIGPIPE IS ACTUALLY NEEDED AS SEND() ON AX.25 SEQPACKET JUST HANGS WHEN THE OTHER SIDE IS GONE FIRST
+memset(&sigact,0,sizeof(struct sigaction));
+sigemptyset(&sigact.sa_mask);
 sigact.sa_handler=calltermclient;
 sigaction(SIGTERM,&sigact,NULL);
 sigaction(SIGPIPE,&sigact,NULL);
@@ -215,7 +217,7 @@ trm.c_oflag|=ONLCR|OPOST;
 memset(&wins,0,sizeof(struct winsize));
 wins.ws_row=24;
 wins.ws_col=80;
-ptychild=forkpty(&master,NULL,&trm,&wins);
+ptychild=forkpty(&master,slavetty,&trm,&wins);
 if(ptychild==0){
 //CHILD (LOGIN)
 close(csock);csock=-1;//DON'T WANT THAT HERE

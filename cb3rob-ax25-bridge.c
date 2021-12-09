@@ -145,6 +145,8 @@ if((sock=socket(PF_PACKET,SOCK_RAW,htons(ETH_P_AX25)))==-1){perror("SOCKET");exi
 //setsockopt(sock,SOL_PACKET,PACKET_RECV_OUTPUT,(char*)&true,sizeof(int));
 
 memset(&sigact,0,sizeof(struct sigaction));
+sigemptyset(&sigact.sa_mask);
+sigact.sa_flags=SA_NODEFER|SA_RESTART;
 sigact.sa_handler=requestreload;
 sigaction(SIGHUP,&sigact,NULL);
 
