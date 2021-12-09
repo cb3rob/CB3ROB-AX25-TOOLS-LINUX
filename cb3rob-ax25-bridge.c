@@ -98,6 +98,7 @@ portcount=0;
 struct ifaddrs*ifaddr,*ifa;
 struct ifreq ifr;
 memset(&myinterfaces,0,sizeof(myinterfaces));
+printf("====================\n");
 printf("%s SCANNING AX.25 INTERFACES\n",srcbtime(0));
 //GETIFADDRS WORKS WITHOUT IP
 if(getifaddrs(&ifaddr)==-1){perror("GETIFADDRS");exit(EXIT_FAILURE);};
