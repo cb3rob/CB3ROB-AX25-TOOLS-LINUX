@@ -311,7 +311,7 @@ tappacket.payload[bytes-16]=(fcs16>>8);//FCS MSB
 tappacket.payload[bytes-15]=(fcs16&0x00FF);//FCS LSB
 printf("%s OUTGOING FCS: %04X MSB: %02X LSB: %02X %ld BYTES:",srcbtime(0),fcs16,tappacket.payload[bytes-16],tappacket.payload[bytes-15],bytes-14);for(n=0;n<bytes-14;n++)printf(" %02X",tappacket.payload[n]);printf("\n");
 if(send(sock,&tappacket.payload,bytes-14,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);udpconnect(argv[2],argv[3]);};
-};//BPQ FRAME
+}else{printf("%s TAP DEVICE IGNORED NON BPQ PROTOCOL FAMILY: %04X PACKET\n",srcbtime(0),ntohs(tappacket.ptype));};//BPQ FRAME
 };//BYTES>0
 };//FDSET
 
