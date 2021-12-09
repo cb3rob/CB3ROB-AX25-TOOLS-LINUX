@@ -21,11 +21,11 @@
 #include<arpa/inet.h>
 #include<fcntl.h>
 #include<linux/ax25.h>
+#include<linux/if.h>
 #include<linux/if_ether.h>
 #include<linux/if_packet.h>
 #include<linux/if_slip.h>
 #include<linux/tcp.h>
-#include<net/if.h>
 #include<netdb.h>
 #include<netinet/in.h>
 #include<pty.h>//COMPILE WITH -lutil

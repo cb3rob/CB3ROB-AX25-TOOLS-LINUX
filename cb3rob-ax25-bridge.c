@@ -29,10 +29,10 @@
 #include<arpa/inet.h>
 #include<fcntl.h>
 #include<ifaddrs.h>
-#include<linux/if_packet.h>
+#include<linux/if.h>
+#include<linux/if_arp.h>
 #include<linux/if_ether.h>
-#include<net/if.h>
-#include<net/if_arp.h>
+#include<linux/if_packet.h>
 #include<sys/ioctl.h>
 #include<sys/socket.h>
 #include<sys/types.h>
