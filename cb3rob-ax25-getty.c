@@ -182,11 +182,10 @@ struct termios trm;
 struct winsize wins;
 char slavetty[256];
 //NO CONTROL-C IN THE CHILD. JUST IN THE MAIN PROCESS
-signal(SIGINT,SIG_IGN);
-signal(SIGCHLD,SIG_DFL);//CHILD DOES CARE
 setsid();
 setpgid(0,0);
-//NO CONTROL-C OR ANY SUCH NONSENSE BEFORE LOGIN IS FINISHED
+signal(SIGINT,SIG_IGN);
+signal(SIGCHLD,SIG_DFL);//CHILD DOES CARE
 pid_t ptychild;ptychild=-1;
 int master;master=-1;
 void calltermclient(int signum){printf("%s CLIENT %d TRIGGERED %s\n",srcbtime(0),getpid(),(signum==SIGTERM?"SIGTERM":"SIGPIPE"));termclient(csock,master,ptychild);};
@@ -195,6 +194,7 @@ void calltermclient(int signum){printf("%s CLIENT %d TRIGGERED %s\n",srcbtime(0)
 memset(&sigact,0,sizeof(struct sigaction));
 sigemptyset(&sigact.sa_mask);
 sigact.sa_handler=calltermclient;
+//NO CONTROL-C OR ANY SUCH NONSENSE BEFORE LOGIN IS FINISHED
 sigaction(SIGTERM,&sigact,NULL);
 sigaction(SIGPIPE,&sigact,NULL);
 

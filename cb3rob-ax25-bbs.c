@@ -9,8 +9,7 @@
 
 //root 9254  0.0  0.0   6592   808 pts/0    S+   12:51   0:00  \_ ./cb3rob-ax25-bbs KISSMX      <--- MAIN LISTEN DAEMON
 //root 9289  0.0  0.0  15048  1832 pts/0    S+   12:52   0:00      \_ ./cb3rob-ax25-bbs KISSMX  <--- CHILD AX.25 HANDLER
-//root 9290  0.0  0.0  85036  4544 pts/4    Ss   12:52   0:00          \_ /bin/login              <--- CHILD PTY HANDLER EXEC(/BIN/LOGIN)
-//user 9342  0.2  0.0  23880  5164 pts/4    S+   12:53   0:00             \_ -bash                <--- SHELL
+//root 9290  0.0  0.0  85036  4544 pts/4    Ss   12:52   0:00          \_ /sbin/bbs              <--- CHILD PTY HANDLER EXEC(/BIN/LOGIN)
 
 #include<fcntl.h>
 #include<linux/ax25.h>
@@ -182,19 +181,18 @@ struct termios trm;
 struct winsize wins;
 char slavetty[256];
 //NO CONTROL-C IN THE CHILD. JUST IN THE MAIN PROCESS
-signal(SIGINT,SIG_IGN);
-signal(SIGCHLD,SIG_DFL);//CHILD DOES CARE
 setsid();
 setpgid(0,0);
-//NO CONTROL-C OR ANY SUCH NONSENSE BEFORE LOGIN IS FINISHED
+signal(SIGINT,SIG_IGN);
+signal(SIGCHLD,SIG_DFL);//CHILD DOES CARE
 pid_t ptychild;ptychild=-1;
 int master;master=-1;
 void calltermclient(int signum){printf("%s CLIENT %d TRIGGERED %s\n",srcbtime(0),getpid(),(signum==SIGTERM?"SIGTERM":"SIGPIPE"));termclient(csock,master,ptychild);};
-
 //TERMINATE CLIENTS NICELY... SIGPIPE IS ACTUALLY NEEDED AS SEND() ON AX.25 SEQPACKET JUST HANGS WHEN THE OTHER SIDE IS GONE FIRST
 memset(&sigact,0,sizeof(struct sigaction));
 sigemptyset(&sigact.sa_mask);
 sigact.sa_handler=calltermclient;
+//NO CONTROL-C OR ANY SUCH NONSENSE BEFORE LOGIN IS FINISHED
 sigaction(SIGTERM,&sigact,NULL);
 sigaction(SIGPIPE,&sigact,NULL);
 
@@ -210,7 +208,6 @@ memset(&trm,0,sizeof(struct termios));
 //SET SOME BASIC TERMIOS STUFF TO AT LEAST GET CRNL - TERMIOS DOESN'T SEEM TO DO JUST CARRIAGE RETURN ONLY
 //PACKET RADIO PROGRAMS PREFER CARRIAGE RETURN ONLY BUT WILL IGNORE NEWLINE (OR SHOULD).
 //FILE TRANSFER PROGRAMS DEMAND 8 BIT TRANSPARENCY.
-//NOTE THAT /bin/login DOESN'T RESET THE TERMINAL TO IT'S PROPER TERMCAP/TERMINFO SPECIFICATION EITHER
 cfmakeraw(&trm);
 trm.c_iflag|=ICRNL;
 trm.c_oflag|=ONLCR|OPOST;
@@ -221,26 +218,14 @@ ptychild=forkpty(&master,slavetty,&trm,&wins);
 if(ptychild==0){
 //CHILD (LOGIN)
 close(csock);csock=-1;//DON'T WANT THAT HERE
-//MAKE PRINTF WORK IN THE BBS VERSION - FORKPTY DID THE REST
-stdin=freopen(slavetty,"r",stdin);
-stdout=freopen(slavetty,"a",stdout);
-stderr=freopen(slavetty,"a",stderr);
-
-printf("Welcome to MuTiNy BBS\n\n");
-printf("A CB3ROB/CYBERBUNKER Operation\n\n");
-printf("Opening Soon!\n\n");
-printf("Testing Really Long Record spanning multiple packets!\n\n");
-printf("ZZZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXXX\n\n");
-
-char*loginargv[]={"/bin/login","-p","-h",sourcecall,NULL};
+char*loginargv[]={"/sbin/bbs",sourcecall,destcall,NULL};
 char*loginenvp[]={"TERM=dumb",NULL};
-execve("/bin/login",&loginargv[0],&loginenvp[0]);
+execve("/sbin/bbs",&loginargv[0],&loginenvp[0]);
 exit(EXIT_SUCCESS);
 }else{
 //PARENT (DATA RELAY)
 if(fcntl(master,F_SETFL,O_NONBLOCK)==-1)exit(EXIT_FAILURE);
 FD_ZERO(&readfds);
-signal(SIGCHLD,SIG_DFL);//CHILD DOES CARE
 while(waitpid(ptychild,NULL,WNOHANG)!=ptychild){
 FD_SET(master,&readfds);
 FD_SET(csock,&readfds);
