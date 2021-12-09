@@ -182,7 +182,9 @@ struct termios trm;
 struct winsize wins;
 //NO CONTROL-C IN THE CHILD. JUST IN THE MAIN PROCESS
 signal(SIGINT,SIG_IGN);
+signal(SIGCHLD,SIG_DFL);//CHILD DOES CARE
 setsid();
+setpgid(0,0);
 //NO CONTROL-C OR ANY SUCH NONSENSE BEFORE LOGIN IS FINISHED
 pid_t ptychild;ptychild=-1;
 int master;master=-1;
@@ -285,6 +287,7 @@ if(argc<2){printf("USAGE: %s <SERVICE-CALLSIGN-SSID> [INTERFACE-CALLSIGN]\n\nIF 
 
 signal(SIGHUP,SIG_IGN);
 signal(SIGQUIT,SIG_IGN);
+signal(SIGCHLD,SIG_IGN);//PARENT DOESN'T CARE
 
 bsock=-1;setupsock(argv[1],argv[2]);
 
