@@ -57,8 +57,10 @@ socklen_t clen;
 
 int portcount;
 int needreload;
+time_t lastreload;
 
 int sock;
+
 
 struct interfaces{
 int ifindex;
@@ -121,6 +123,7 @@ portcount++;
 freeifaddrs(ifaddr);
 needreload=0;
 printf("%s DONE SCANNING INTERFACES\n",srcbtime(0));
+lastreload=time(NULL);
 if(portcount<2){printf("%s INSUFFICIENT (%d) AX.25 PORTS FOR BRIDGING\n",srcbtime(0),portcount);needreload=1;sleep(5);};//INSUFFICIENT
 };//GETINTERFACES
 
@@ -152,6 +155,8 @@ sigaction(SIGHUP,&sigact,NULL);
 
 //FORCE RELOAD FOR STARTUP
 needreload=1;
+//INITIALIZE LASTRELOAD
+lastreload=time(NULL);
 
 fcntl(sock,F_SETFL,fcntl(sock,F_GETFL,0)|O_NONBLOCK);
 
@@ -204,6 +209,9 @@ dsockaddrll.sll_ifindex=myinterfaces[po].ifindex;
 
 if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,sizeof(struct sockaddr_ll))==-1){perror("SENDTO");needreload=1;continue;};
 };//FOR FORWARD PACKET TO EACH INTERFACE THAT WAS UP AT PROGRAM START IT DID NOT ORIGINATE FROM
+
+//RELOAD EVERY 2 MINUTES ANYWAY
+if(lastreload<(time(NULL)-120))needreload=1;
 
 };//WHILE 1
 };//MAIN
