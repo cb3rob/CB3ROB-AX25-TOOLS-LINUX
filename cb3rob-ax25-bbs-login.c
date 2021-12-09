@@ -35,8 +35,8 @@ if(argc<3){printf("THIS PROGRAM SHOULD BE EXECUTED BY CB3ROB AX25 BBS ONLY\n");e
 if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
 
 login=time(NULL);
-node=argv[1];
-call=argv[2];
+call=argv[1];
+node=argv[2];
 
 //STRIP SSID
 memset(user,0,sizeof(user));
