@@ -3,12 +3,12 @@
 //One CyberBunker Avenue
 //Republic CyberBunker
 
-// 'TELNETD' FOR AX.25 - STARTS /bin/login ON A PTY
+// 'TELNETD' FOR AX.25 - STARTS BBS SHELL ENVIRONMENT ON A PTY
 
 //ALPHA DEVELOPMENT STATUS - UNDER CONSTRUCTION - NO ASSUMPTIONS TOWARDS SECURITY
 
-//root 9254  0.0  0.0   6592   808 pts/0    S+   12:51   0:00  \_ ./cb3rob-ax25-getty KISSMX      <--- MAIN LISTEN DAEMON
-//root 9289  0.0  0.0  15048  1832 pts/0    S+   12:52   0:00      \_ ./cb3rob-ax25-getty KISSMX  <--- CHILD AX.25 HANDLER
+//root 9254  0.0  0.0   6592   808 pts/0    S+   12:51   0:00  \_ ./cb3rob-ax25-bbs KISSMX      <--- MAIN LISTEN DAEMON
+//root 9289  0.0  0.0  15048  1832 pts/0    S+   12:52   0:00      \_ ./cb3rob-ax25-bbs KISSMX  <--- CHILD AX.25 HANDLER
 //root 9290  0.0  0.0  85036  4544 pts/4    Ss   12:52   0:00          \_ /bin/login              <--- CHILD PTY HANDLER EXEC(/BIN/LOGIN)
 //user 9342  0.2  0.0  23880  5164 pts/4    S+   12:53   0:00             \_ -bash                <--- SHELL
 
