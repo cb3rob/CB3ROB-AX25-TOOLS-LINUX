@@ -182,6 +182,7 @@ struct termios trm;
 struct winsize wins;
 //NO CONTROL-C IN THE CHILD. JUST IN THE MAIN PROCESS
 signal(SIGINT,SIG_IGN);
+signal(SIGCHLD,SIG_DFL);//CHILD DOES CARE
 setsid();
 setpgid(0,0);
 //NO CONTROL-C OR ANY SUCH NONSENSE BEFORE LOGIN IS FINISHED
