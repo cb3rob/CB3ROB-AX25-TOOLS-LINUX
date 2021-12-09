@@ -13,11 +13,10 @@
 #include<fcntl.h>
 #include<linux/ax25.h>
 #include<linux/if.h>
+#include<linux/if_arp.h>
 #include<linux/if_tun.h>
 #include<linux/if_slip.h>
 #include<linux/tcp.h>
-#include<net/if.h>
-#include<net/if_arp.h>
 #include<netdb.h>
 #include<netinet/in.h>
 #include<stdio.h>

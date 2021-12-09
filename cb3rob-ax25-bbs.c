@@ -3,6 +3,15 @@
 //One CyberBunker Avenue
 //Republic CyberBunker
 
+// 'TELNETD' FOR AX.25 - STARTS /bin/login ON A PTY
+
+//ALPHA DEVELOPMENT STATUS - UNDER CONSTRUCTION - NO ASSUMPTIONS TOWARDS SECURITY
+
+//root 9254  0.0  0.0   6592   808 pts/0    S+   12:51   0:00  \_ ./cb3rob-ax25-getty KISSMX      <--- MAIN LISTEN DAEMON
+//root 9289  0.0  0.0  15048  1832 pts/0    S+   12:52   0:00      \_ ./cb3rob-ax25-getty KISSMX  <--- CHILD AX.25 HANDLER
+//root 9290  0.0  0.0  85036  4544 pts/4    Ss   12:52   0:00          \_ /bin/login              <--- CHILD PTY HANDLER EXEC(/BIN/LOGIN)
+//user 9342  0.2  0.0  23880  5164 pts/4    S+   12:53   0:00             \_ -bash                <--- SHELL
+
 #include<fcntl.h>
 #include<linux/ax25.h>
 #include<stdio.h>
@@ -14,18 +23,25 @@
 #include<time.h>
 #include<unistd.h>
 #include<stdint.h>
+#include<utmp.h>
+#include<termios.h>
+#include<pty.h>
+#include<wait.h>
+#include<signal.h>
 
 #define MAXBACKLOG 16
 
 int bsock;
 int csock;
-char tbuf[257];
+char tbuf[(AX25_MTU*7)];//MORE EFFECTIVE THROUGHPUT WHEN SENDING IN BURST
 struct full_sockaddr_ax25 baddr;
 struct full_sockaddr_ax25 caddr;
+struct sigaction sigact;
 socklen_t clen;
 fd_set writefds;
 fd_set readfds;
 struct timeval tv;
+int nfds;
 
 char sourcecall[10];
 char destcall[10];
@@ -96,7 +112,7 @@ if(ascii[n+1]==0x31)if((ascii[n+2]>=0x30)&&(ascii[n+2]<=0x35))if(ascii[n+3]==0){
 return(-1);
 };//CALLTOBIN
 
-void sendclient(void*data,ssize_t total){
+ssize_t sendclient(void*data,ssize_t total){
 ssize_t bytes;
 ssize_t thisblock;
 ssize_t sent;
@@ -110,16 +126,18 @@ FD_SET(csock,&writefds);
 tv.tv_sec=60;
 tv.tv_usec=0;
 //ACTUALLY HAVE TO SELECT BEFORE WRITE. OR STUFF GOES MISSING HERE TOO. WELCOME TO LINUX
-printf("CHILD %d WAIT FOR SELECT\n",getpid());
+printf("%s CLIENT %d WAIT FOR SELECT\n",srcbtime(0),getpid());
 select(csock+1,NULL,&writefds,NULL,&tv);
 //FALL THROUGH IS SEND ANYWAY TO CHECK IF STILL CONNECTED
-thisblock=AX25_MTU;flags=0;if((total-sent)<=AX25_MTU){thisblock=(total-sent);flags=MSG_EOR;};
-printf("CHILD %d SENDING: %ld SENT: %ld TOTAL: %ld\n",getpid(),thisblock,sent,total);
+thisblock=AX25_MTU;flags=MSG_DONTWAIT;if((total-sent)<=AX25_MTU){thisblock=(total-sent);flags|=MSG_EOR;};
+printf("%s CLIENT %d SENDING: %ld SENT: %ld TOTAL: %ld\n",srcbtime(0),getpid(),thisblock,sent,total);
+//SEND TO DISCONNECTED PEER ACTUALLY WILL BLOCK FOREVER ANYWAY REGARDLESS OF NONBLOCK SETTINGS ON AX.25 SOCK_SEQPACKET BUT IT WILL TRIGGER SIGPIPE... HANDLE SIGPIPE OR DEFUNCT PROCESS!
 bytes=send(csock,(uint8_t*)data+sent,thisblock,flags);
-printf("CHILD %d SENT: %ld\n",getpid(),bytes);
-if(bytes==-1){printf("CHILD %d DISCONNECTED UPON SEND\n",getpid());close(csock);exit(EXIT_FAILURE);};
+printf("%s CLIENT %d SENT: %ld\n",srcbtime(0),getpid(),bytes);
+if(bytes<1)break;
 sent+=bytes;
 };//WHILE DATA REMAINING
+return(bytes);
 };//SENDCLIENT
 
 void setupsock(char*service,char*interface){
@@ -147,35 +165,187 @@ break;
 };//WHILE NOT SOCKET LOOP
 };//SETUPSOCK
 
+void termclient(int csock,int master,pid_t ptychild){
+printf("%s CLIENT %d TERMINATING\n",srcbtime(0),getpid());
+memset(&tbuf,0,sizeof(tbuf));
+if(csock!=-1){printf("%s CLIENT %d CLOSING SOCKET %d\n",srcbtime(0),getpid(),csock);close(csock);csock=-1;};
+if(master!=-1){printf("%s CLIENT %d CLOSING MASTER %d\n",srcbtime(0),getpid(),master);close(master);master=-1;};
+if(ptychild!=-1){printf("%s CLIENT %d KILLING LOGIN %d\n",srcbtime(0),getpid(),ptychild);kill(ptychild,SIGTERM);sleep(10);kill(ptychild,SIGKILL);ptychild=-1;};
+printf("%s CLIENT %d TERMINATED\n",srcbtime(0),getpid());
+exit(EXIT_SUCCESS);
+};//TERMCLIENT
+
 int clientcode(){
-fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK);
 //FORK CHILD
-printf("CONNECTED\n");
-printf("CLIENT SOCKET: %d\n",csock);
+ssize_t bytes;
+struct termios trm;
+struct winsize wins;
+//NO CONTROL-C IN THE CHILD. JUST IN THE MAIN PROCESS
+signal(SIGINT,SIG_IGN);
+setsid();
+//NO CONTROL-C OR ANY SUCH NONSENSE BEFORE LOGIN IS FINISHED
+pid_t ptychild;ptychild=-1;
+int master;master=-1;
+void calltermclient(int signum){printf("%s CLIENT %d TRIGGERED %s\n",srcbtime(0),getpid(),(signum==SIGTERM?"SIGTERM":"SIGPIPE"));termclient(csock,master,ptychild);};
+memset(&sigact,0,sizeof(struct sigaction));
+
+//TERMINATE CLIENTS NICELY... SIGPIPE IS ACTUALLY NEEDED AS SEND() ON AX.25 SEQPACKET JUST HANGS WHEN THE OTHER SIDE IS GONE FIRST
+sigact.sa_handler=calltermclient;
+sigaction(SIGTERM,&sigact,NULL);
+sigaction(SIGPIPE,&sigact,NULL);
+
+fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK);
+printf("%s CLIENT %d CONNECTED\n",srcbtime(0),getpid());
+printf("%s CLIENT %d SOCKET: %d\n",srcbtime(0),getpid(),csock);
 memset(&tbuf,0,sizeof(tbuf));
 addresstoascii(&caddr.fsa_ax25.sax25_call,sourcecall);
 snprintf(tbuf,sizeof(tbuf)-1,"%s %s -> %s\r\r",srcbtime(0),sourcecall,destcall);
-sendclient(tbuf,0);
+if(sendclient(tbuf,0)<0)termclient(csock,master,ptychild);
 memset(&tbuf,0,sizeof(tbuf));
+memset(&trm,0,sizeof(struct termios));
+//SET SOME BASIC TERMIOS STUFF TO AT LEAST GET CRNL - TERMIOS DOESN'T SEEM TO DO JUST CARRIAGE RETURN ONLY
+//PACKET RADIO PROGRAMS PREFER CARRIAGE RETURN ONLY BUT WILL IGNORE NEWLINE (OR SHOULD).
+//FILE TRANSFER PROGRAMS DEMAND 8 BIT TRANSPARENCY.
+//NOTE THAT /bin/login DOESN'T RESET THE TERMINAL TO IT'S PROPER TERMCAP/TERMINFO SPECIFICATION EITHER
+cfmakeraw(&trm);
+trm.c_iflag|=ICRNL;
+trm.c_oflag|=ONLCR|OPOST;
+memset(&wins,0,sizeof(struct winsize));
+wins.ws_row=24;
+wins.ws_col=80;
+ptychild=forkpty(&master,NULL,&trm,&wins);
+if(ptychild==0){
+//CHILD (LOGIN)
+close(csock);csock=-1;//DON'T WANT THAT HERE
+
+//SEND SOME FULL MTU 256 PACKETS TO FORCE BROKEN SOFTWARE (LINPAC) TO GET FIXED BY THEIR AUTHORS ;P
+//REMOVE IN PRODUCTION VERSIONS... CAN'T SHIP OUR INTERNAL VERSIONS OF LINPAC - THEY HAVE TO FIX THE MAIN DISTRO
+//NEVER MIND IT'S MANY OTHER BUGS (SCREEN RESCALING, AUTOBIN NOT WORKING, LOCKFILES, NEEDING AXPORTS, ETC) BUT THIS IS AN IMPORTANT ONE ;)
+//THIS IS JUST GONNA HAVE TO WORK ON EVERYTHING OUT THERE FOR PROPER FILE TRANSFERS LATER ON - WEED THE BROKEN ONES OUT NOW ;)
+
 sendclient("Welcome to MuTiNy BBS\r\r",0);
 sendclient("A CB3ROB/CYBERBUNKER Operation\r\r",0);
 sendclient("Opening Soon!\r\r",0);
 sendclient("Testing Really Long Record spanning multiple packets!\r\r",0);
 unsigned char binarybuf[]="ZZZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXXX\r\r";
 int n;for(n=0;n<20;n++)sendclient(binarybuf,0);
-sendclient("Disconnecting, bye!\r",0);
+
+//sendclient("Disconnecting, bye!\r",0);
 //HAVE TO SLEEP BEFORE CLOSE OR LINUX AX.25 STACK WILL SIMPLY 'FORGET' TO DELIVER ANY PACKETS STILL IN THE QUEUE. NO FLAGS, NO SYNC() NO SELECT() NO NOTHING SEEMS TO FIX THIS.
 //POOF. THEY'RE GONE. IT'S A BUG. (PROBABLY SOMETHING TO DO WITH THE ABILITY TO SEND MULTIPLE PACKETS OUT OF ORDER NEEDING CONFIRMATION ON THEM ALL INSTEAD OF JUST ONE ;)
-sleep(60);
-close(csock);
-//printf("RECEIVING: %d:\n",recv(csock,tbuf,sizeof(tbuf),0));
-//recv(csock,&tbuf,sizeof(tbuf)-1,0);
-//printf("RECEIVED: %s\n",tbuf);
+//sleep(60);
+//close(csock);
+//exit(EXIT_SUCCESS);
+//};//CLIENTCODE
+
+//WE'LL SIMPLY SOLVE THE 'TERMIOS CAN'T CONVERT NEWLINE TO CARRIAGE RETURN-ONLY OUTPUT' BY RUNNING THE BBS ENVIRONMENT
+//IN IT'S OWN CHROOT WITH IT'S OWN /bin CONTAINING ONLY PROGRAMS THAT SOLELY USE CARRIAGE RETURN (ALSO KEEPS USERS OUT OF /etc/passwd AS WE DON'T HAVE LIBRARY FUNCTIONS FOR SHADOW)
+
+//BBS MODE REQUIRES IT'S OWN UNIX SHELL TOOLS WHICH EACH TERMINATE EACH LINE WITH CARRIAGE RETURN (TERMIOS CAN'T CONVERT)
+//AS MOST PACKET RADIO TERMINALS CAN'T SEND CONTROL-C,CONTROL-D OR CONTROL-Z THEY SHOULD ABORT WITH \r#ABORT#\r LIKE AUTOBIN
+//AS ROWS AND COLUMNS OF THE TERMINAL ARE NOT KNOWN (FOR WINSIZE ASSUMED TO BE 80*24 BUT CAN BE ANYTHING) PREFERABLY FORMAT OUTPUT FOR 40*20
+
+//INTERCEPTING AUTOBIN UPLOADS IS PROBABLY GONNA BE IMPOSSIBLE WHILE NOT IN THE BBS SHELL
+
+//TO DO:
+
+//IGNORE ALL SIGNALS - NO EPIPE TERMINATION DURING USER CREATION
+
+//CHECK IF SOURCE CALLSIGN HAS UID AND PASSWORD
+
+//CREATE HOMEDIR
+//CHOWN HOMEDIR
+//CHMOD HOMEDIR
+
+//CREATE passwd ENTRY
+
+//RE-ENABLE SIGNALS
+
+//ASK FOR PASSWORD IF USER HAS PASSWORD SET
+//INFORM USER ABOUT OPTION TO SET PASSWORD IF NO PASSWORD SET
+
+//CRYPT COMPARE PASSWORD
+
+//DROP ROOT TO UID/GID/EUID/EGID
+
+//SET ENV FOR USER
+
+//SET RLIMIT FOR USER
+
+//CHROOT - CHECK IF THIS WORKS WITH PTY'S
+
+//EXECUTE BBS SHELL
+
+//FOR NOW JUST RUN THE CODE AS IT IS IN GETTY:
+
+char*loginargv[]={"/bin/login","-p","-h",sourcecall,NULL};
+char*loginenvp[]={"TERM=dumb",NULL};
+execve("/bin/login",&loginargv[0],&loginenvp[0]);
+exit(EXIT_SUCCESS);
+}else{
+//PARENT (DATA RELAY)
+if(fcntl(master,F_SETFL,O_NONBLOCK)==-1)exit(EXIT_FAILURE);
+FD_ZERO(&readfds);
+while(waitpid(ptychild,NULL,WNOHANG)!=ptychild){
+FD_SET(master,&readfds);
+FD_SET(csock,&readfds);
+tv.tv_sec=600;
+tv.tv_usec=0;
+nfds=master;if(csock>master)nfds=csock;
+select(nfds+1,&readfds,NULL,NULL,&tv);
+
+//BYTES FROM PROGRAM
+if(FD_ISSET(master,&readfds)){
+//STICK TO MTU SIZE - TBUF IS ONE LONGER FOR TRAILING ZERO ON STRINGS INTERNALLY
+bytes=read(master,&tbuf,sizeof(tbuf));
+if(bytes<1)termclient(csock,master,ptychild);
+if(bytes>0){
+printf("%s CLIENT %d READ %ld BYTES FROM LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
+//HAVE TERMIOS DO THIS
+//for(n=0;n<bytes;n++)if(tbuf[n]==0x0A)tbuf[n]=0x0D;
+if(sendclient(&tbuf,bytes)<1)termclient(csock,master,ptychild);
+};//RECEIVED BYTES FROM PROGRAM
+};//FD SET
+
+//BYTES TO PROGRAM
+if(FD_ISSET(csock,&readfds)){
+bytes=recv(csock,&tbuf,sizeof(tbuf),0);
+if(bytes<1)termclient(csock,master,ptychild);
+if(bytes>0){
+printf("%s CLIENT %d SENT %ld BYTES TO LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
+//HAVE TERMIOS DO THIS
+//for(n=0;n<bytes;n++)if(tbuf[n]==0x0D)tbuf[n]=0x0A;
+if(write(master,&tbuf,bytes)<1)termclient(csock,master,ptychild);
+};//SENT BYTES TO PROGRAM
+};//FD SET
+};//WHILE CHILD RUNNING
+ptychild=-1;
+
+};//PARENT
+
+printf("%s CLIENT %d WAIT FOR SOCKET %d CLOSE\n",srcbtime(0),getpid(),csock);
+//WAIT AT MOST 60 SECONDS FOR CLIENT TO CLOSE SOCKET OR CLOSE SOCKET OURSELVES.
+FD_ZERO(&readfds);
+tv.tv_sec=60;
+tv.tv_usec=0;
+//THIS BIT IS KINDA PROBLEMATIC AS CLOSING A SOCKET BEFORE ALL DATA IS FULLY PROCESSED ON THE OTHER SIDE LEADS TO REMAINING DATA GETTING LOST
+//FOR EXAMPLE WHILE TYPING exit DURING A LONG ls -al OUTPUT - GIVE IT UP TO 60 SECONDS TO COMPLETE OR LET THE OTHER SIDE DISCONNECT FOR US
+while((tv.tv_sec>0)||(tv.tv_usec>0)){
+FD_SET(csock,&readfds);
+select(csock+1,&readfds,NULL,NULL,&tv);
+if(recv(csock,&tbuf,sizeof(tbuf),0)<1)break;
+};//WAITCLIENTCLOSE
+termclient(csock,master,ptychild);
 exit(EXIT_SUCCESS);
 };//CLIENTCODE
 
 int main(int argc,char**argv){
+if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
+
 if(argc<2){printf("USAGE: %s <SERVICE-CALLSIGN-SSID> [INTERFACE-CALLSIGN]\n\nIF THE PROCESS IS TO LISTEN ON A (VIRTUAL) CALLSIGN OTHER THAN ONE OF AN INTERFACE SPECIFY THE INTERFACE AS WELL\n",argv[0]);exit(EXIT_FAILURE);};
+
+signal(SIGHUP,SIG_IGN);
+signal(SIGQUIT,SIG_IGN);
 
 bsock=-1;setupsock(argv[1],argv[2]);
 
@@ -184,7 +354,7 @@ FD_ZERO(&readfds);//BSOCK CHANGES IF INTERFACE CHANGES
 FD_SET(bsock,&readfds);
 tv.tv_sec=600;
 tv.tv_usec=0;
-printf("WAIT FOR CLIENT\n");
+printf("%s WAIT FOR CLIENT\n",srcbtime(0));
 select(bsock+1,&readfds,NULL,NULL,&tv);
 if(FD_ISSET(bsock,&readfds)){
 clen=sizeof(struct full_sockaddr_ax25);

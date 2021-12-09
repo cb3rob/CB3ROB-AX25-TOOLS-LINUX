@@ -1,5 +1,5 @@
 #!/bin/sh
-gcc -Wall -O3 -o cb3rob-ax25-bbs cb3rob-ax25-bbs.c
+gcc -Wall -O3 -o cb3rob-ax25-bbs cb3rob-ax25-bbs.c -lutil
 gcc -Wall -O3 -o cb3rob-ax25-bridge cb3rob-ax25-bridge.c
 gcc -Wall -O3 -o cb3rob-ax25-getty cb3rob-ax25-getty.c -lutil
 gcc -Wall -O3 -o cb3rob-axudp-attach cb3rob-axudp-attach.c
