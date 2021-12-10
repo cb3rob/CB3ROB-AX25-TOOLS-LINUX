@@ -70,7 +70,7 @@ printf("=====================\rWelcome to MuTiNy BBS\r=====================\r");
 };//PRINTBANNER
 
 void printprompt(){
-printf("%s @ %s> ",user,node);
+printf("[ %s @ %s : %s ]> ",user,node,getcwd(NULL,0));
 };//PRINTPROMPT
 
 void terminit(){
@@ -141,10 +141,11 @@ memset(&directory,0,sizeof(directory));
 memset(&homedir,0,sizeof(homedir));
 snprintf(homedir,sizeof(homedir)-1,"%s/MEMBERS/%s",basepath,username);
 mkdir(homedir,00710);
+snprintf(homedir,sizeof(homedir)-1,"/MEMBERS/%s",username);
 //SETRLIMITS HERE
 //DROP ROOT HERE
 chroot(basepath);
-chdir("/");
+chdir(homedir);
 return(0);
 };//INITUSER;
 
@@ -165,37 +166,76 @@ printf("INVALID COMMAND - TRY HELP\r");
 
 void cmdhelp(){
 printf("HELLO - SAYS HELLO\r");
-printf("BYE   - TERMINATES SESSION\r");
-printf("QUIT  - TERMINATES SESSION\r");
-printf("EXIT  - TERMINATES SESSION\r");
 printf("DIR   - LISTS FILES\r");
+printf("CHDIR - CHANGES DIRECTORY\r");
+printf("READ  - READS TEXT FILE\r");
+printf("EXIT  - TERMINATES SESSION\r");
 };//CMDHELP
 
 int cmddir(){
 DIR *curdir;
 struct dirent *direntry;
 struct stat filestat;
+size_t total;
+size_t files;
+size_t dirs;
+total=0;
+files=0;
+dirs=0;
 curdir=opendir(".");
 if(curdir==NULL){printf("ERROR OPENING DIRECTORY\r");return(-1);};//ERROR
+printf("\rDIRECTORY OF %s\r",getcwd(NULL,0));
+printf("../\r");
 while((direntry=readdir(curdir))!=NULL){
 if((direntry->d_name[0]>=0x30&&direntry->d_name[0]<=0x39)||(direntry->d_name[0]>=0x41&&direntry->d_name[0]<=0x5A)||(direntry->d_name[0]>=0x61&&direntry->d_name[0]<=0x7A)){
 switch(direntry->d_type){
 case DT_REG:
 if(stat(direntry->d_name,&filestat)==-1){printf("ERROR ON FILESTAT%s\r",direntry->d_name);continue;};
-printf("FILE: %s %lu\r",direntry->d_name,filestat.st_size);
+printf("%s %lu\r",direntry->d_name,filestat.st_size);
+total+=filestat.st_size;
+files++;
 continue;
 case DT_DIR:
-printf("DIR:  %s\r",direntry->d_name);
+printf("%s/\r",direntry->d_name);
+dirs++;
 continue;
 default:
 continue;
 };//SWITCH ENTRY TYPE
 };//VALID FILENAME
 };//WHILE DIRENTRY
+printf("TOTAL: %lu BYTES IN: %lu FILES AND %lu DIRECTORIES\r\r",total,files,dirs);
 if(closedir(curdir)==-1){printf("ERROR CLOSING DIRECTORY\r");return(-1);};//ERROR;
 return(0);
 };//CMDDIR
 
+void cmdchdir(char*dir){
+int n;
+if(dir!=NULL){
+for(n=0;dir[n]==0x20;n++);
+dir=dir+n;//STRIP LEADING SPACE
+if(dir[0]){//JUST SHOW PWD
+if(chdir(dir))printf("CHDIR TO %s FAILED\r",dir);
+};//IF PARAMETERS OTHER THAN SPACE
+};//IF PARAMETERS
+printf("CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
+};//CMDCHDIR
+
+void cmdread(char*filename){
+int n;
+if(filename!=NULL){
+for(n=0;filename[n]==0x20;n++);
+filename=filename+n;//STRIP LEADING SPACE
+if(filename[0])printf("\rREAD: %ld BYTES\r\r",readfile(filename,BPNLCR));else printf("FILENAME?\r\r");
+};//IF PARAMETERS
+};//CMDCHDIR
+
+void cmdautobin(char *bincmd,char*username){
+printf("\r#ABORT#\r");
+sync();
+sleep(2);
+printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r");
+};//CMDAUTOBIN
 
 int main(int argc,char**argv){
 int n;
@@ -229,6 +269,9 @@ printf("\rREAD: %ld BYTES\r\r",readfile("/ETC/WELCOME.TXT",BPNLCR));
 while(1){//IF THE PARENT DIES WE DIE BY SIGNAL ANYWAY
 printprompt();
 currentcmd=getcommand();
+if(!bcmp(currentcmd,"#BIN#",5)){cmdautobin(currentcmd,user);continue;};
+if(!bcmp(currentcmd,"CHDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdchdir((char*)currentcmd+5);continue;};
+if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};
 if(!strcmp(currentcmd,"HELLO")){cmdhello(user);continue;};
 if(!strcmp(currentcmd,"BYE")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"EXIT")){cmdbye(user);continue;};
