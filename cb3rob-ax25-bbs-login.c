@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include<crypt.h>
 #include<dirent.h>
 #include<fcntl.h>
@@ -166,7 +167,23 @@ memset(&homedir,0,sizeof(homedir));
 snprintf(homedir,sizeof(homedir)-1,"%s/MEMBERS/%s",basepath,username);
 uid=65535;
 gid=65535;
-pw=NULL;
+FILE*fp;
+struct group *gp;
+struct group gpa;
+gp=getgrnam("MUTINY");
+if(gp==NULL){
+gpa.gr_name="MUTINY";
+gpa.gr_passwd="x";
+gpa.gr_mem=NULL;
+};//IF GP NULL
+while(gp==NULL){
+for(gpa.gr_gid=1000;getgrgid(gpa.gr_gid)!=NULL;gpa.gr_gid++);
+fp=fopen("/etc/group","a");
+putgrent(&gpa,fp);
+fclose(fp);
+gp=getgrnam("MUTINY");
+};//WHILE GP NULL
+
 pw=getpwnam(username);
 if(pw==NULL){
 char salt[3];
@@ -182,23 +199,22 @@ memset(&pwa,0,sizeof(struct passwd));
 pwa.pw_name=username;
 pwa.pw_passwd=crypt(username,salt);
 pwa.pw_dir=homedir;
+pwa.pw_gid=gp->gr_gid;
 pwa.pw_shell="/bin/false";
+};//IF PW NULL
 while(pw==NULL){
-printf("NO USERDATA FOUND FOR USERNAME %s\r",username);
+printf("NO USERDATA FOUND FOR USERNAME %s - CREATING...\r",username);
 for(pwa.pw_uid=10000;getpwuid(pwa.pw_uid)!=NULL;pwa.pw_uid++);
-pwa.pw_gid=pwa.pw_uid;
-FILE*fp;
 fp=fopen("/etc/passwd","a");
 putpwent(&pwa,fp);
 //putspent(
 fclose(fp);
 pw=getpwnam(username);
-};
+};//WHILE PW NULL
 uid=pw->pw_uid;
-gid=pw->pw_uid;
+gid=pw->pw_gid;
 printf("FOUND USERDATA UID: %d GID: %d\r",uid,gid);
 printf("NO PASSWORD FOR USER: %s SET SO NOT ASKING\r",username);
-};//USER HAS UNIX ACCOUNT ALREADY
 
 memset(&directory,0,sizeof(directory));
 //MAKE SURE THE SYSTEM IS INITIALIZED AND ALL DIRECTORIES EXIST (TAKES LONGER TO CHECK THAN TO JUST TRY TO CREATE THEM IF NOT ;)
