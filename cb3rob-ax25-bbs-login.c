@@ -103,8 +103,10 @@ unsigned char *getcommand(){
 static unsigned char cmd[128];
 int n;
 memset(&cmd,0,sizeof(cmd));
+//BLOCKING MODE?!. IT'D BETTER BE BLOCKING.
+if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK))return(NULL);
 for(n=0;n<sizeof(cmd)-1;n++){
-if(read(STDIN_FILENO,(void*)&cmd+n,1)!=1){ ; };//BLOCKING MODE?!. IT'D BETTER BE.
+if(read(STDIN_FILENO,(void*)&cmd+n,1)!=1)return(NULL);
 if(cmd[n]==0x09)cmd[n]=0x20;//HTAB TO SPACE
 if(cmd[n]=='\n')cmd[n]='r';//LINUX CRAP TO CARRIAGE RETURN (IF DOS, NEXT ONE WILL BOGUS OUT AT THE 'NO ENTERS AT START OF LINE' IN THE NEXT ROUND)
 if((n==0)&&((cmd[n]==0x20)||(cmd[n]=='\r'))){cmd[n]=0;n--;continue;};//NO SPACES OR ENTERS AT START OF LINE
@@ -176,7 +178,6 @@ printwelcome();
 printf("\rRead: %ld Bytes\r\r",readfile("/ETC/WELCOME.TXT",BPNLCR));
 printprompt();
 currentcmd=getcommand();
-printf("Got command: %s\r",currentcmd);
 printf("BYE\r\r");
 sync();
 sleep(10);
