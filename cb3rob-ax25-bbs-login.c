@@ -1,10 +1,13 @@
 #include<dirent.h>
 #include<fcntl.h>
+#include<pwd.h>
 #include<stdio.h>
 #include<stdint.h>
 #include<stdlib.h>
 #include<string.h>
+#include<sys/resource.h>
 #include<sys/stat.h>
+#include<sys/time.h>
 #include<sys/types.h>
 #include<termios.h>
 #include<time.h>
@@ -117,8 +120,43 @@ return((char*)&cmd);
 
 int inituser(char *username){
 char directory[256];
-if(user==NULL)return(-1);
 char basepath[]="/var/bbs";
+struct rlimit rlim;
+if(username==NULL)return(-1);
+
+// RLIMIT_CPU     /* CPU time in seconds */
+// RLIMIT_FSIZE   /* Maximum filesize */
+// RLIMIT_DATA    /* max data size */
+// RLIMIT_STACK   /* max stack size */
+// RLIMIT_CORE    /* max core file size */
+// RLIMIT_RSS     /* max resident set size */
+// RLIMIT_NPROC   /* max number of processes */
+// RLIMIT_NOFILE  /* max number of open files */
+// RLIMIT_MEMLOCK /* max locked-in-memory address space*/
+rlim.rlim_cur=RLIM_INFINITY;
+rlim.rlim_max=RLIM_INFINITY;
+setrlimit(RLIMIT_CPU,&rlim);
+rlim.rlim_cur=0;
+rlim.rlim_max=0;
+setrlimit(RLIMIT_CORE,&rlim);
+rlim.rlim_cur=256;
+rlim.rlim_max=256;
+setrlimit(RLIMIT_NOFILE,&rlim);
+rlim.rlim_cur=8388608;
+rlim.rlim_max=8388608;
+setrlimit(RLIMIT_STACK,&rlim);
+rlim.rlim_cur=16;
+rlim.rlim_max=16;
+setrlimit(RLIMIT_NPROC,&rlim);
+rlim.rlim_cur=33554432;
+rlim.rlim_max=33554432;
+setrlimit(RLIMIT_DATA,&rlim);
+setrlimit(RLIMIT_MEMLOCK,&rlim);
+setrlimit(RLIMIT_FSIZE,&rlim);
+setrlimit(RLIMIT_RSS,&rlim);
+//SLOW EM DOWN A BIT JUST IN CASE
+nice(+19);
+
 memset(&directory,0,sizeof(directory));
 //MAKE SURE THE SYSTEM IS INITIALIZED AND ALL DIRECTORIES EXIST (TAKES LONGER TO CHECK THAN TO JUST TRY TO CREATE THEM IF NOT ;)
 mkdir(basepath,00710);
