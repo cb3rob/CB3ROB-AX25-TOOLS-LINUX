@@ -107,6 +107,7 @@ memset(&cmd,0,sizeof(cmd));
 if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK))return(NULL);
 for(n=0;n<sizeof(cmd)-1;n++){
 if(read(STDIN_FILENO,(void*)&cmd+n,1)!=1)return(NULL);
+if((cmd[n]>=0x61)&&(cmd[n]<=0x7A))cmd[n]&=0xDF;//ALL TO UPPER CASE
 if(cmd[n]==0x09)cmd[n]=0x20;//HTAB TO SPACE
 if(cmd[n]=='\n')cmd[n]='r';//LINUX CRAP TO CARRIAGE RETURN (IF DOS, NEXT ONE WILL BOGUS OUT AT THE 'NO ENTERS AT START OF LINE' IN THE NEXT ROUND)
 if((n==0)&&((cmd[n]==0x20)||(cmd[n]=='\r'))){cmd[n]=0;n--;continue;};//NO SPACES OR ENTERS AT START OF LINE
