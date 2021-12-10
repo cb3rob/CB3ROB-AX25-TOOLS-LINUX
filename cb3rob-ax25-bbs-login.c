@@ -128,9 +128,7 @@ char basepath[]="/var/bbs";
 struct rlimit rlim;
 struct passwd *pw;
 struct passwd pwa;
-
 if(username==NULL)return(-1);
-
 // RLIMIT_CPU     /* CPU time in seconds */
 // RLIMIT_FSIZE   /* Maximum filesize */
 // RLIMIT_DATA    /* max data size */
@@ -163,39 +161,39 @@ setrlimit(RLIMIT_FSIZE,&rlim);
 setrlimit(RLIMIT_RSS,&rlim);
 //SLOW EM DOWN A BIT JUST IN CASE
 nice(+19);
-
 //NEED THIS FOR USER CREATION ANYWAY
 memset(&homedir,0,sizeof(homedir));
 snprintf(homedir,sizeof(homedir)-1,"%s/MEMBERS/%s",basepath,username);
 uid=65535;
 gid=65535;
+pw=NULL;
 pw=getpwnam(username);
-if(pw==NULL)pw=getpwnam("nobody");//WORKAROUND UNTIL WE FIGURE OUT HOW TO ADD USERS PROPERLY
 if(pw==NULL){
+char salt[3];
+srand(time(NULL));
+salt[0]=(rand()&0x3F)+0x2E;
+if(salt[0]>0x39)salt[0]+=0x07;
+if(salt[0]>0x5A)salt[0]+=0x06;
+salt[1]=(rand()&0x3F)+0x2E;
+if(salt[1]>0x39)salt[1]+=0x07;
+if(salt[1]>0x5A)salt[1]+=0x06;
+salt[2]=0x00;
+memset(&pwa,0,sizeof(struct passwd));
+pwa.pw_name=username;
+pwa.pw_passwd=crypt(username,salt);
+pwa.pw_dir=homedir;
+pwa.pw_shell="/bin/false";
+while(pw==NULL){
 printf("NO USERDATA FOUND FOR USERNAME %s\r",username);
-//local only. no nis/yp. won't resolve names within chroot either
-//unsigned char salt[3];
-//srand(time(NULL));
-//salt[0]=(rand()&0x3F)+0x2E;
-//if(salt[0]>0x39)salt[0]+=0x07;
-//if(salt[0]>0x5A)salt[0]+=0x06;
-//salt[1]=(rand()&0x3F)+0x2E;
-//if(salt[1]>0x39)salt[1]+=0x07;
-//if(salt[1]>0x5A)salt[1]+=0x06;
-//salt[2]=0x00;
-//memset(&pwa,0,sizeof(struct passwd));
-//pwa.pw_name=username;
-//pwa.pw_passwd=crypt(username,salt);
-//pwa.pw_uid=0;
-//pwa.pw_gid=0;
-//pwa.pw_dir=homedir;
-//pwa.pw_shell="/bin/false";
-//FILE*fp;
-//fp=fopen("/etc/passwd","a");
-//putpwent(&pwd,fd);
+for(pwa.pw_uid=10000;getpwuid(pwa.pw_uid)!=NULL;pwa.pw_uid++);
+pwa.pw_gid=pwa.pw_uid;
+FILE*fp;
+fp=fopen("/etc/passwd","a");
+putpwent(&pwa,fp);
 //putspent(
-//fclose(fp);
-}else{
+fclose(fp);
+pw=getpwnam(username);
+};
 uid=pw->pw_uid;
 gid=pw->pw_uid;
 printf("FOUND USERDATA UID: %d GID: %d\r",uid,gid);
