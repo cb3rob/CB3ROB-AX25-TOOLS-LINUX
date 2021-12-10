@@ -14,12 +14,15 @@
 time_t login;
 char *node;
 char *call;
+char *line;
 char user[7];
 
 struct termios trmorgin;
 struct termios trmorgout;
 struct termios trmorgerr;
 struct termios trmraw;
+
+char homedir[256];
 
 char*srcbtime(time_t t){
 static char rcbt[22];
@@ -34,29 +37,31 @@ return(rcbt);
 ssize_t readfile(const char *filename,int asciimode){
 uint8_t rbuf[512];
 int ffd;
-ssize_t bytes;
+ssize_t rbytes;
+ssize_t wbytes;
 ssize_t total;
 int n;
 if(filename==NULL)return(0);
 ffd=open(filename,O_RDONLY,O_NONBLOCK|O_SYNC);
-if(ffd==-1)return(0);
+if(ffd==-1)return(-1);
 total=0;
-bytes=0;
-while((bytes=read(ffd,rbuf,sizeof(rbuf)))>1){
-if(asciimode&BPNLCR)for(n=0;n<bytes;n++)if(rbuf[n]=='\n')rbuf[n]='\r';
-if((bytes=write(STDOUT_FILENO,rbuf,bytes))<1)break;
+wbytes=0;
+rbytes=0;
+while((rbytes=read(ffd,rbuf,sizeof(rbuf)))>1){
+if(asciimode&BPNLCR)for(n=0;n<rbytes;n++)if(rbuf[n]=='\n')rbuf[n]='\r';
+if((wbytes=write(STDOUT_FILENO,rbuf,rbytes))<1)break;
 sync();
-total+=bytes;
+total+=wbytes;
 };//WHILE READBLOCK
 close(ffd);
 //CLEAR MEMORY
 memset(rbuf,0,sizeof(rbuf));
-if(bytes==-1)return(0);
+if(wbytes<1)return(-1);
 return(total);
 };//READFILE
 
 void printstatus(){
-printf("TIME: %s\rCALL: %s\rUSER: %s\rNODE: %s\rLINE: %s\r\r",srcbtime(0),call,user,node,ttyname(STDIN_FILENO));
+printf("TIME: %s\rCALL: %s\rUSER: %s\rNODE: %s\rLINE: %s\r\r",srcbtime(0),call,user,node,line);
 };//PRINTWELCOME
 
 void printwelcome(){
@@ -110,6 +115,36 @@ printf("\rCOMMAND: %s\r",cmd);//PRINT IT IN CASE USER HAS ECHO OFF IN HIS TERMIN
 return(cmd);
 };//GETCOMMAND
 
+int inituser(char *username){
+char directory[256];
+if(user==NULL)return(-1);
+char basepath[]="/var/bbs";
+memset(&directory,0,sizeof(directory));
+//MAKE SURE THE SYSTEM IS INITIALIZED AND ALL DIRECTORIES EXIST (TAKES LONGER TO CHECK THAN TO JUST TRY TO CREATE THEM IF NOT ;)
+mkdir(basepath,00710);
+snprintf(directory,sizeof(directory)-1,"%s/ETC",basepath);
+mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE
+snprintf(directory,sizeof(directory)-1,"%s/UPLOAD",basepath);
+mkdir(directory,01710);//SET STICKY BIT - TEMP FILES DURING UPLOADS
+snprintf(directory,sizeof(directory)-1,"%s/FILES",basepath);
+mkdir(directory,01750);//SET STICKY BIT - USERS CAN REMOVE FILES THEY UPLOADED
+snprintf(directory,sizeof(directory)-1,"%s/MEMBERS",basepath);
+mkdir(directory,00710);//NO LISTING THE OTHER CALLSIGNS
+snprintf(directory,sizeof(directory)-1,"%s/MAIL",basepath);
+mkdir(directory,00710);//JUST YOUR OWN
+memset(&directory,0,sizeof(directory));
+//GETPWNAM() TO SEE IF FIRST VISIT
+//ASK FOR PASSWORD IF SET, EXPLAIN HOW TO SET ONE IF NOT
+//ADD USER TO NIS/YP/PASSWD IF FIRST VISIT
+memset(&homedir,0,sizeof(homedir));
+snprintf(homedir,sizeof(homedir)-1,"%s/MEMBERS/%s",basepath,username);
+mkdir(homedir,00710);
+//SETRLIMITS HERE
+//DROP ROOT HERE
+chroot(basepath);
+return(0);
+};//INITUSER;
+
 int main(int argc,char**argv){
 int n;
 unsigned char *currentcmd;
@@ -120,6 +155,7 @@ if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
 login=time(NULL);
 call=argv[1];
 node=argv[2];
+line=ttyname(STDIN_FILENO);//DO THIS BEFORE CHROOT
 
 //STRIP SSID
 memset(user,0,sizeof(user));
@@ -132,10 +168,12 @@ setbuf(stdout,NULL);
 terminit();
 //TERMINAL RAW
 termraw();
+//INIT USER
+inituser(user);
 
 printstatus();
 printwelcome();
-printf("\rRead: %ld Bytes\r\r",readfile("/etc/passwd",BPNLCR));
+printf("\rRead: %ld Bytes\r\r",readfile("/ETC/WELCOME.TXT",BPNLCR));
 printprompt();
 currentcmd=getcommand();
 printf("Got command: %s\r",currentcmd);
