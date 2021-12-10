@@ -1,6 +1,7 @@
 #include<crypt.h>
 #include<dirent.h>
 #include<fcntl.h>
+#include<grp.h>
 #include<pwd.h>
 #include<stdio.h>
 #include<stdint.h>
@@ -166,55 +167,56 @@ nice(+19);
 //NEED THIS FOR USER CREATION ANYWAY
 memset(&homedir,0,sizeof(homedir));
 snprintf(homedir,sizeof(homedir)-1,"%s/MEMBERS/%s",basepath,username);
-
 uid=0;
 gid=0;
 pw=getpwnam(username);
+if(pw==NULL)pw=getpwnam("nobody");//WORKAROUND UNTIL WE FIGURE OUT HOW TO ADD USERS PROPERLY
 if(pw==NULL){
 printf("NO USERDATA FOUND FOR USERNAME %s\r",username);
-memset(&pwa,0,sizeof(struct passwd));
-pwa.pw_name=username;
-pwa.pw_passwd=crypt(username,"xx");//CODE PROPER SEED RANDOMIZER FOR DES LOL.
-pwa.pw_dir=homedir;
-pwa.pw_shell="/bin/false";
+//memset(&pwa,0,sizeof(struct passwd));
+//pwa.pw_name=username;
+//pwa.pw_passwd=crypt(username,"xx");//CODE PROPER SEED RANDOMIZER FOR DES LOL.
+//pwa.pw_dir=homedir;
+//pwa.pw_shell="/bin/false";
 //putpwent(
 }else{
 uid=pw->pw_uid;
 gid=pw->pw_uid;
 printf("FOUND USERDATA UID: %d GID: %d\r",uid,gid);
 printf("NO PASSWORD FOR USER: %s SET SO NOT ASKING\r",username);
-//SETUID,SETGID,SETEUID,SETEGID... THE WORKS HERE. MAYBE MOVE THIS DOWN TO UNDER DIR CREATION
 };//USER HAS UNIX ACCOUNT ALREADY
 
 memset(&directory,0,sizeof(directory));
 //MAKE SURE THE SYSTEM IS INITIALIZED AND ALL DIRECTORIES EXIST (TAKES LONGER TO CHECK THAN TO JUST TRY TO CREATE THEM IF NOT ;)
-mkdir(basepath,00710);
+mkdir(basepath,00711);
 snprintf(directory,sizeof(directory)-1,"%s/ETC",basepath);
-mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE
+mkdir(directory,00711);//NONE OF THE USERS CONCERN HERE
 snprintf(directory,sizeof(directory)-1,"%s/BIN",basepath);
-mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE
+mkdir(directory,00711);//NONE OF THE USERS CONCERN HERE
 snprintf(directory,sizeof(directory)-1,"%s/UPLOAD",basepath);
-mkdir(directory,01710);//SET STICKY BIT - TEMP FILES DURING UPLOADS
+mkdir(directory,01711);//SET STICKY BIT - TEMP FILES DURING UPLOADS
 snprintf(directory,sizeof(directory)-1,"%s/FILES",basepath);
-mkdir(directory,01750);//SET STICKY BIT - USERS CAN REMOVE FILES THEY UPLOADED
+mkdir(directory,01755);//SET STICKY BIT - USERS CAN REMOVE FILES THEY UPLOADED
 snprintf(directory,sizeof(directory)-1,"%s/MEMBERS",basepath);
-mkdir(directory,00710);//NO LISTING THE OTHER CALLSIGNS
+mkdir(directory,00711);//NO LISTING THE OTHER CALLSIGNS
 snprintf(directory,sizeof(directory)-1,"%s/MAIL",basepath);
-mkdir(directory,00710);//JUST YOUR OWN
+mkdir(directory,00711);//JUST YOUR OWN
 memset(&directory,0,sizeof(directory));
 //GETPWNAM() TO SEE IF FIRST VISIT
 //ASK FOR PASSWORD IF SET, EXPLAIN HOW TO SET ONE IF NOT
 //ADD USER TO NIS/YP/PASSWD IF FIRST VISIT
-mkdir(homedir,00710);
+mkdir(homedir,00700);
 chown(homedir,uid,gid);
 chown(line,uid,gid);
 snprintf(homedir,sizeof(homedir)-1,"/MEMBERS/%s",username);
 chroot(basepath);
 chdir(homedir);
+//DROP ROOT
+setgroups(1,&gid);
+setegid(gid);
+setgid(gid);
 setuid(uid);
-setgid(uid);
 seteuid(uid);
-setegid(uid);
 return(0);
 };//INITUSER;
 
@@ -290,6 +292,13 @@ if(chdir(dir))printf("CHDIR TO %s FAILED\r",dir);
 printf("CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
 };//CMDCHDIR
 
+//void cmdshell(){
+//NO WORKY IN CHROOT... PROBABLY THE COPIED SHELL IS NOT STATIC COMPILED
+//termorg();
+//system("/bin/sh");
+//termraw();
+//};//CMDSHELL
+
 void cmdread(char*filename){
 int n;
 if(filename!=NULL){
@@ -346,9 +355,9 @@ if(!strcmp(currentcmd,"BYE")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"EXIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"QUIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"HELP")){cmdhelp();continue;};
+//if(!strcmp(currentcmd,"GODMODE")){cmdshell();continue;};
 if(!strcmp(currentcmd,"DIR")){cmddir();continue;};
 cmdinvalid();
 };//COMMAND LOOP
 exit(EXIT_SUCCESS);
 };//MAIN
-
