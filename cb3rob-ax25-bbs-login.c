@@ -1,3 +1,4 @@
+#include<dirent.h>
 #include<fcntl.h>
 #include<stdio.h>
 #include<stdint.h>
@@ -123,6 +124,8 @@ memset(&directory,0,sizeof(directory));
 mkdir(basepath,00710);
 snprintf(directory,sizeof(directory)-1,"%s/ETC",basepath);
 mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE
+snprintf(directory,sizeof(directory)-1,"%s/BIN",basepath);
+mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE
 snprintf(directory,sizeof(directory)-1,"%s/UPLOAD",basepath);
 mkdir(directory,01710);//SET STICKY BIT - TEMP FILES DURING UPLOADS
 snprintf(directory,sizeof(directory)-1,"%s/FILES",basepath);
@@ -165,7 +168,33 @@ printf("HELLO - SAYS HELLO\r");
 printf("BYE   - TERMINATES SESSION\r");
 printf("QUIT  - TERMINATES SESSION\r");
 printf("EXIT  - TERMINATES SESSION\r");
-};//CMDINVALID
+printf("DIR   - LISTS FILES\r");
+};//CMDHELP
+
+int cmddir(){
+DIR *curdir;
+struct dirent *direntry;
+struct stat filestat;
+curdir=opendir(".");
+if(curdir==NULL){printf("ERROR OPENING DIRECTORY\r");return(-1);};//ERROR
+while((direntry=readdir(curdir))!=NULL){
+if((direntry->d_name[0]>=0x30&&direntry->d_name[0]<=0x39)||(direntry->d_name[0]>=0x41&&direntry->d_name[0]<=0x5A)||(direntry->d_name[0]>=0x61&&direntry->d_name[0]<=0x7A)){
+switch(direntry->d_type){
+case DT_REG:
+if(stat(direntry->d_name,&filestat)==-1){printf("ERROR ON FILESTAT%s\r",direntry->d_name);continue;};
+printf("FILE: %s %lu\r",direntry->d_name,filestat.st_size);
+continue;
+case DT_DIR:
+printf("DIR:  %s\r",direntry->d_name);
+continue;
+default:
+continue;
+};//SWITCH ENTRY TYPE
+};//VALID FILENAME
+};//WHILE DIRENTRY
+if(closedir(curdir)==-1){printf("ERROR CLOSING DIRECTORY\r");return(-1);};//ERROR;
+return(0);
+};//CMDDIR
 
 
 int main(int argc,char**argv){
@@ -205,6 +234,7 @@ if(!strcmp(currentcmd,"BYE")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"EXIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"QUIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"HELP")){cmdhelp();continue;};
+if(!strcmp(currentcmd,"DIR")){cmddir();continue;};
 cmdinvalid();
 };//COMMAND LOOP
 exit(EXIT_SUCCESS);
