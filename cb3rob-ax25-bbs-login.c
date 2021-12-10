@@ -72,10 +72,6 @@ void printprompt(){
 printf("%s @ %s> ",user,node);
 };//PRINTPROMPT
 
-void printinvalid(){
-printf("INVALID COMMAND\r");
-};//PRINTINVALID
-
 void terminit(){
 memset(&trmorgin,0,sizeof(struct termios));
 memset(&trmorgout,0,sizeof(struct termios));
@@ -99,7 +95,7 @@ tcsetattr(STDOUT_FILENO,0,&trmraw);
 tcsetattr(STDERR_FILENO,0,&trmraw);
 };//TERMRAW
 
-unsigned char *getcommand(){
+char*getcommand(){
 static unsigned char cmd[128];
 int n;
 memset(&cmd,0,sizeof(cmd));
@@ -115,7 +111,7 @@ if(cmd[n]=='\r'){cmd[n]=0;break;};//DONE
 if((cmd[n]<0x20)||cmd[n]>0x7E){cmd[n]=0;n--;continue;};//NO WEIRD BINARY STUFF
 };//FOR
 printf("\rCOMMAND: %s\r",cmd);//PRINT IT IN CASE USER HAS ECHO OFF IN HIS TERMINAL
-return(cmd);
+return((char*)&cmd);
 };//GETCOMMAND
 
 int inituser(char *username){
@@ -145,12 +141,36 @@ mkdir(homedir,00710);
 //SETRLIMITS HERE
 //DROP ROOT HERE
 chroot(basepath);
+chdir("/");
 return(0);
 };//INITUSER;
 
+int cmdbye(char *username){
+printf("SEE YOU AGAIN SOON %s\r",username);
+sync();
+sleep(10);
+exit(EXIT_SUCCESS);
+};//CMDBYE
+
+void cmdhello(char *username){
+printf("HELLO %s\r",username);
+};//CMDHELLO
+
+void cmdinvalid(){
+printf("INVALID COMMAND - TRY HELP\r");
+};//CMDINVALID
+
+void cmdhelp(){
+printf("HELLO - SAYS HELLO\r");
+printf("BYE   - TERMINATES SESSION\r");
+printf("QUIT  - TERMINATES SESSION\r");
+printf("EXIT  - TERMINATES SESSION\r");
+};//CMDINVALID
+
+
 int main(int argc,char**argv){
 int n;
-unsigned char *currentcmd;
+char *currentcmd;
 
 if(argc<3){printf("THIS PROGRAM SHOULD BE EXECUTED BY CB3ROB AX25 BBS ONLY\n");exit(EXIT_FAILURE);};
 if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
@@ -176,12 +196,17 @@ inituser(user);
 
 printstatus();
 printwelcome();
-printf("\rRead: %ld Bytes\r\r",readfile("/ETC/WELCOME.TXT",BPNLCR));
+printf("\rREAD: %ld BYTES\r\r",readfile("/ETC/WELCOME.TXT",BPNLCR));
+while(1){//IF THE PARENT DIES WE DIE BY SIGNAL ANYWAY
 printprompt();
 currentcmd=getcommand();
-printf("BYE\r\r");
-sync();
-sleep(10);
+if(!strcmp(currentcmd,"HELLO")){cmdhello(user);continue;};
+if(!strcmp(currentcmd,"BYE")){cmdbye(user);continue;};
+if(!strcmp(currentcmd,"EXIT")){cmdbye(user);continue;};
+if(!strcmp(currentcmd,"QUIT")){cmdbye(user);continue;};
+if(!strcmp(currentcmd,"HELP")){cmdhelp();continue;};
+cmdinvalid();
+};//COMMAND LOOP
 exit(EXIT_SUCCESS);
-};
+};//MAIN
 
