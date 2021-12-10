@@ -167,8 +167,8 @@ nice(+19);
 //NEED THIS FOR USER CREATION ANYWAY
 memset(&homedir,0,sizeof(homedir));
 snprintf(homedir,sizeof(homedir)-1,"%s/MEMBERS/%s",basepath,username);
-uid=0;
-gid=0;
+uid=65535;
+gid=65535;
 pw=getpwnam(username);
 if(pw==NULL)pw=getpwnam("nobody");//WORKAROUND UNTIL WE FIGURE OUT HOW TO ADD USERS PROPERLY
 if(pw==NULL){
@@ -188,24 +188,38 @@ printf("NO PASSWORD FOR USER: %s SET SO NOT ASKING\r",username);
 
 memset(&directory,0,sizeof(directory));
 //MAKE SURE THE SYSTEM IS INITIALIZED AND ALL DIRECTORIES EXIST (TAKES LONGER TO CHECK THAN TO JUST TRY TO CREATE THEM IF NOT ;)
-mkdir(basepath,00711);
+mkdir(basepath,00755);
+chmod(basepath,00755);//FORCE FIX PERMISSIONS ON EXISTING DIRECTORIES
 snprintf(directory,sizeof(directory)-1,"%s/ETC",basepath);
 mkdir(directory,00711);//NONE OF THE USERS CONCERN HERE
+chmod(directory,00711);
+chown(directory,0,0);
 snprintf(directory,sizeof(directory)-1,"%s/BIN",basepath);
 mkdir(directory,00711);//NONE OF THE USERS CONCERN HERE
+chmod(directory,00711);
+chown(directory,0,0);
 snprintf(directory,sizeof(directory)-1,"%s/UPLOAD",basepath);
-mkdir(directory,01711);//SET STICKY BIT - TEMP FILES DURING UPLOADS
+mkdir(directory,01755);//SET STICKY BIT - TEMP FILES DURING UPLOADS
+chmod(directory,01755);
+chown(directory,0,0);
 snprintf(directory,sizeof(directory)-1,"%s/FILES",basepath);
 mkdir(directory,01755);//SET STICKY BIT - USERS CAN REMOVE FILES THEY UPLOADED
+chmod(directory,01755);
+chown(directory,0,0);
 snprintf(directory,sizeof(directory)-1,"%s/MEMBERS",basepath);
 mkdir(directory,00711);//NO LISTING THE OTHER CALLSIGNS
+chmod(directory,00711);
+chown(directory,0,0);
 snprintf(directory,sizeof(directory)-1,"%s/MAIL",basepath);
 mkdir(directory,00711);//JUST YOUR OWN
+chmod(directory,00711);
+chown(directory,0,0);
 memset(&directory,0,sizeof(directory));
 //GETPWNAM() TO SEE IF FIRST VISIT
 //ASK FOR PASSWORD IF SET, EXPLAIN HOW TO SET ONE IF NOT
 //ADD USER TO NIS/YP/PASSWD IF FIRST VISIT
 mkdir(homedir,00700);
+chmod(homedir,00700);
 chown(homedir,uid,gid);
 chown(line,uid,gid);
 snprintf(homedir,sizeof(homedir)-1,"/MEMBERS/%s",username);
@@ -239,23 +253,30 @@ void cmdhelp(){
 printf("HELLO - SAYS HELLO\r");
 printf("DIR   - LISTS FILES\r");
 printf("CHDIR - CHANGES DIRECTORY\r");
+printf("CD    - CHANGES DIRECTORY\r");
 printf("READ  - READS TEXT FILE\r");
 printf("EXIT  - TERMINATES SESSION\r");
 };//CMDHELP
 
-int cmddir(){
-DIR *curdir;
-struct dirent *direntry;
+int cmddir(char *dirname){
+DIR*curdir;
+struct dirent*direntry;
 struct stat filestat;
 size_t total;
 size_t files;
 size_t dirs;
+int n;
+if(dirname==NULL)dirname=getcwd(NULL,0);
+for(n=0;dirname[n]==0x20;n++);
+dirname=dirname+n;//STRIP LEADING SPACE
+if(!dirname[0])dirname=getcwd(NULL,0);
 total=0;
 files=0;
 dirs=0;
-curdir=opendir(".");
-if(curdir==NULL){printf("ERROR OPENING DIRECTORY\r");return(-1);};//ERROR
-printf("\rDIRECTORY OF %s\r\r",getcwd(NULL,0));
+curdir=opendir(dirname);
+if(curdir==NULL){printf("ERROR OPENING DIRECTORY: %s\r",dirname);return(-1);};//ERROR
+printf("\rDIRECTORY OF %s\r\r",dirname);
+printf("./\r");
 printf("../\r");
 while((direntry=readdir(curdir))!=NULL){
 if((direntry->d_name[0]>=0x30&&direntry->d_name[0]<=0x39)||(direntry->d_name[0]>=0x41&&direntry->d_name[0]<=0x5A)||(direntry->d_name[0]>=0x61&&direntry->d_name[0]<=0x7A)){
@@ -349,14 +370,15 @@ printprompt();
 currentcmd=getcommand();
 if(!bcmp(currentcmd,"#BIN#",5)){cmdautobin(currentcmd,user);continue;};
 if(!bcmp(currentcmd,"CHDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdchdir((char*)currentcmd+5);continue;};
+if(!bcmp(currentcmd,"CD",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdchdir((char*)currentcmd+2);continue;};
 if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};
 if(!strcmp(currentcmd,"HELLO")){cmdhello(user);continue;};
 if(!strcmp(currentcmd,"BYE")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"EXIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"QUIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"HELP")){cmdhelp();continue;};
+if(!bcmp(currentcmd,"DIR",3))if((currentcmd[3]==0x20)||(currentcmd[3]==0)){cmddir((char*)currentcmd+3);continue;};
 //if(!strcmp(currentcmd,"GODMODE")){cmdshell();continue;};
-if(!strcmp(currentcmd,"DIR")){cmddir();continue;};
 cmdinvalid();
 };//COMMAND LOOP
 exit(EXIT_SUCCESS);
