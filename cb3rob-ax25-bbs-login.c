@@ -20,6 +20,8 @@ char *node;
 char *call;
 char *line;
 char user[7];
+uid_t uid;
+gid_t gid;
 
 struct termios trmorgin;
 struct termios trmorgout;
@@ -122,6 +124,8 @@ int inituser(char *username){
 char directory[256];
 char basepath[]="/var/bbs";
 struct rlimit rlim;
+struct passwd *pw;
+
 if(username==NULL)return(-1);
 
 // RLIMIT_CPU     /* CPU time in seconds */
@@ -157,6 +161,18 @@ setrlimit(RLIMIT_RSS,&rlim);
 //SLOW EM DOWN A BIT JUST IN CASE
 nice(+19);
 
+uid=0;
+gid=0;
+pw=getpwnam(username);
+if(pw==NULL)printf("NO USERDATA FOUND\r");
+else{
+uid=pw->pw_uid;
+gid=pw->pw_uid;
+printf("FOUND USERDATA UID: %d GID: %d\r",uid,gid);
+printf("NO PASSWORD FOR USER: %s SET SO NOT ASKING\r",username);
+//SETUID,SETGID,SETEUID,SETEGID... THE WORKS HERE. MAYBE MOVE THIS DOWN TO UNDER DIR CREATION
+};//USER HAS UNIX ACCOUNT ALREADY
+
 memset(&directory,0,sizeof(directory));
 //MAKE SURE THE SYSTEM IS INITIALIZED AND ALL DIRECTORIES EXIST (TAKES LONGER TO CHECK THAN TO JUST TRY TO CREATE THEM IF NOT ;)
 mkdir(basepath,00710);
@@ -179,11 +195,15 @@ memset(&directory,0,sizeof(directory));
 memset(&homedir,0,sizeof(homedir));
 snprintf(homedir,sizeof(homedir)-1,"%s/MEMBERS/%s",basepath,username);
 mkdir(homedir,00710);
+chown(homedir,uid,gid);
+chown(line,uid,gid);
 snprintf(homedir,sizeof(homedir)-1,"/MEMBERS/%s",username);
-//SETRLIMITS HERE
-//DROP ROOT HERE
 chroot(basepath);
 chdir(homedir);
+setuid(uid);
+setgid(uid);
+seteuid(uid);
+setegid(uid);
 return(0);
 };//INITUSER;
 
