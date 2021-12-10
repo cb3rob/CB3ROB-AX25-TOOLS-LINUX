@@ -173,12 +173,28 @@ pw=getpwnam(username);
 if(pw==NULL)pw=getpwnam("nobody");//WORKAROUND UNTIL WE FIGURE OUT HOW TO ADD USERS PROPERLY
 if(pw==NULL){
 printf("NO USERDATA FOUND FOR USERNAME %s\r",username);
+//local only. no nis/yp. won't resolve names within chroot either
+//unsigned char salt[3];
+//srand(time(NULL));
+//salt[0]=(rand()&0x3F)+0x2E;
+//if(salt[0]>0x39)salt[0]+=0x07;
+//if(salt[0]>0x5A)salt[0]+=0x06;
+//salt[1]=(rand()&0x3F)+0x2E;
+//if(salt[1]>0x39)salt[1]+=0x07;
+//if(salt[1]>0x5A)salt[1]+=0x06;
+//salt[2]=0x00;
 //memset(&pwa,0,sizeof(struct passwd));
 //pwa.pw_name=username;
-//pwa.pw_passwd=crypt(username,"xx");//CODE PROPER SEED RANDOMIZER FOR DES LOL.
+//pwa.pw_passwd=crypt(username,salt);
+//pwa.pw_uid=0;
+//pwa.pw_gid=0;
 //pwa.pw_dir=homedir;
 //pwa.pw_shell="/bin/false";
-//putpwent(
+//FILE*fp;
+//fp=fopen("/etc/passwd","a");
+//putpwent(&pwd,fd);
+//putspent(
+//fclose(fp);
 }else{
 uid=pw->pw_uid;
 gid=pw->pw_uid;
