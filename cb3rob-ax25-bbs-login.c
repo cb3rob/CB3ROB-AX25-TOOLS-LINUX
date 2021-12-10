@@ -1,3 +1,4 @@
+#include<crypt.h>
 #include<dirent.h>
 #include<fcntl.h>
 #include<pwd.h>
@@ -125,6 +126,7 @@ char directory[256];
 char basepath[]="/var/bbs";
 struct rlimit rlim;
 struct passwd *pw;
+struct passwd pwa;
 
 if(username==NULL)return(-1);
 
@@ -161,11 +163,22 @@ setrlimit(RLIMIT_RSS,&rlim);
 //SLOW EM DOWN A BIT JUST IN CASE
 nice(+19);
 
+//NEED THIS FOR USER CREATION ANYWAY
+memset(&homedir,0,sizeof(homedir));
+snprintf(homedir,sizeof(homedir)-1,"%s/MEMBERS/%s",basepath,username);
+
 uid=0;
 gid=0;
 pw=getpwnam(username);
-if(pw==NULL)printf("NO USERDATA FOUND\r");
-else{
+if(pw==NULL){
+printf("NO USERDATA FOUND FOR USERNAME %s\r",username);
+memset(&pwa,0,sizeof(struct passwd));
+pwa.pw_name=username;
+pwa.pw_passwd=crypt(username,"xx");//CODE PROPER SEED RANDOMIZER FOR DES LOL.
+pwa.pw_dir=homedir;
+pwa.pw_shell="/bin/false";
+//putpwent(
+}else{
 uid=pw->pw_uid;
 gid=pw->pw_uid;
 printf("FOUND USERDATA UID: %d GID: %d\r",uid,gid);
@@ -192,8 +205,6 @@ memset(&directory,0,sizeof(directory));
 //GETPWNAM() TO SEE IF FIRST VISIT
 //ASK FOR PASSWORD IF SET, EXPLAIN HOW TO SET ONE IF NOT
 //ADD USER TO NIS/YP/PASSWD IF FIRST VISIT
-memset(&homedir,0,sizeof(homedir));
-snprintf(homedir,sizeof(homedir)-1,"%s/MEMBERS/%s",basepath,username);
 mkdir(homedir,00710);
 chown(homedir,uid,gid);
 chown(line,uid,gid);
