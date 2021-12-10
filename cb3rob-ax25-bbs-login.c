@@ -40,12 +40,13 @@ int n;
 if(filename==NULL)return(0);
 ffd=open(filename,O_RDONLY,O_NONBLOCK|O_SYNC);
 if(ffd==-1)return(0);
+total=0;
 bytes=0;
 while((bytes=read(ffd,rbuf,sizeof(rbuf)))>1){
 if(asciimode&BPNLCR)for(n=0;n<bytes;n++)if(rbuf[n]=='\n')rbuf[n]='\r';
 if((bytes=write(STDOUT_FILENO,rbuf,bytes))<1)break;
 sync();
-total=total+bytes;
+total+=bytes;
 };//WHILE READBLOCK
 close(ffd);
 //CLEAR MEMORY
@@ -61,6 +62,14 @@ printf("TIME: %s\rCALL: %s\rUSER: %s\rNODE: %s\rLINE: %s\r\r",srcbtime(0),call,u
 void printwelcome(){
 printf("=====================\rWelcome to MuTiNy BBS\r=====================\r");
 };//PRINTBANNER
+
+void printprompt(){
+printf("%s @ %s> ",user,node);
+};//PRINTPROMPT
+
+void printinvalid(){
+printf("INVALID COMMAND\r");
+};//PRINTINVALID
 
 void terminit(){
 memset(&trmorgin,0,sizeof(struct termios));
@@ -85,8 +94,25 @@ tcsetattr(STDOUT_FILENO,0,&trmraw);
 tcsetattr(STDERR_FILENO,0,&trmraw);
 };//TERMRAW
 
+unsigned char *getcommand(){
+static unsigned char cmd[128];
+int n;
+memset(&cmd,0,sizeof(cmd));
+for(n=0;n<sizeof(cmd)-1;n++){
+if(read(STDIN_FILENO,(void*)&cmd+n,1)!=1){ ; };//BLOCKING MODE?!. IT'D BETTER BE.
+if(cmd[n]==0x09)cmd[n]=0x20;//HTAB TO SPACE
+if(cmd[n]=='\n')cmd[n]='r';//LINUX CRAP TO CARRIAGE RETURN (IF DOS, NEXT ONE WILL BOGUS OUT AT THE 'NO ENTERS AT START OF LINE' IN THE NEXT ROUND)
+if((n==0)&&((cmd[n]==0x20)||(cmd[n]=='\r'))){cmd[n]=0;n--;continue;};//NO SPACES OR ENTERS AT START OF LINE
+if(cmd[n]=='\r'){cmd[n]=0;break;};//DONE
+if((cmd[n]<0x20)||cmd[n]>0x7E){cmd[n]=0;n--;continue;};//NO WEIRD BINARY STUFF
+};//FOR
+printf("\rCOMMAND: %s\r",cmd);//PRINT IT IN CASE USER HAS ECHO OFF IN HIS TERMINAL
+return(cmd);
+};//GETCOMMAND
+
 int main(int argc,char**argv){
 int n;
+unsigned char *currentcmd;
 
 if(argc<3){printf("THIS PROGRAM SHOULD BE EXECUTED BY CB3ROB AX25 BBS ONLY\n");exit(EXIT_FAILURE);};
 if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
@@ -109,9 +135,11 @@ termraw();
 
 printstatus();
 printwelcome();
-readfile("/etc/passwd",0);
-printf("Read: %ld Bytes\n",readfile("/etc/passwd",BPNLCR));
-printf("\r\rBYE\r");
+printf("\rRead: %ld Bytes\r\r",readfile("/etc/passwd",BPNLCR));
+printprompt();
+currentcmd=getcommand();
+printf("Got command: %s\r",currentcmd);
+printf("BYE\r\r");
 sync();
 sleep(10);
 exit(EXIT_SUCCESS);
