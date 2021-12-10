@@ -184,7 +184,7 @@ files=0;
 dirs=0;
 curdir=opendir(".");
 if(curdir==NULL){printf("ERROR OPENING DIRECTORY\r");return(-1);};//ERROR
-printf("\rDIRECTORY OF %s\r",getcwd(NULL,0));
+printf("\rDIRECTORY OF %s\r\r",getcwd(NULL,0));
 printf("../\r");
 while((direntry=readdir(curdir))!=NULL){
 if((direntry->d_name[0]>=0x30&&direntry->d_name[0]<=0x39)||(direntry->d_name[0]>=0x41&&direntry->d_name[0]<=0x5A)||(direntry->d_name[0]>=0x61&&direntry->d_name[0]<=0x7A)){
@@ -204,7 +204,7 @@ continue;
 };//SWITCH ENTRY TYPE
 };//VALID FILENAME
 };//WHILE DIRENTRY
-printf("TOTAL: %lu BYTES IN: %lu FILES AND %lu DIRECTORIES\r\r",total,files,dirs);
+printf("\rTOTAL: %lu BYTES IN: %lu FILES AND %lu DIRECTORIES\r\r",total,files,dirs);
 if(closedir(curdir)==-1){printf("ERROR CLOSING DIRECTORY\r");return(-1);};//ERROR;
 return(0);
 };//CMDDIR
