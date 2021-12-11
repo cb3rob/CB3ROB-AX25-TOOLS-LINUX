@@ -420,7 +420,7 @@ if(!strcmp(currentcmd,"EXIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"QUIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"HELP")){cmdhelp();continue;};
 if(!strcmp(currentcmd,"SALIR")){cmdhelp();continue;};
-if(!bcmp(currentcmd,"DISC"),4){cmdhelp();continue;};
+if(!bcmp(currentcmd,"DISC",4)){cmdhelp();continue;};//DISCONNECT IS GOOD WITH ANY ABBREVIATION
 if(!bcmp(currentcmd,"DIR",3))if((currentcmd[3]==0x20)||(currentcmd[3]==0)){cmddir((char*)currentcmd+3);continue;};
 //if(!strcmp(currentcmd,"GODMODE")){cmdshell();continue;};
 cmdinvalid();
