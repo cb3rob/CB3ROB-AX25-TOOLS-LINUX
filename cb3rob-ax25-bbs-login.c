@@ -33,6 +33,24 @@ struct termios trmraw;
 
 char homedir[256];
 
+int chkcall(char *c){
+int n;
+if(c==NULL)return(-1);
+if((c[0]<0x30)||(c[0]>0x5A)||((c[0]>0x39)&&(c[0]<0x41)))return(-1);//MUST START WITH A-Z0-9
+for(n=1;(n<6)&&(c[n])&&(c[n]!=0x2D);n++){
+if((c[n]<0x30)||(c[n]>0x5A)||((c[n]>0x39)&&(c[n]<0x41)))return(-1);//MUST START WITH A-Z0-9
+}//
+if(c[n]==0)return(n);//NO SSID - WE'RE DONE
+if(c[n++]!=0x2D)return(-1);//SOMETHING INVALID
+if((c[n]<0x30)||(c[n]>0x39))return(-1);//MUST BE 0-9
+n++;
+if(c[n]==0)return(n);//DONE - VALID WITH 1 DIGIT SSID
+if((c[n]<0x30)||(c[n]>0x36))return(-1);//MUST START WITH A-Z0-9
+n++;
+if(c[n]==0)return(n);//NO SSID
+return(-1);//FALLTHROUGH INVALID
+};//CHKCALL
+
 char*srcbtime(time_t t){
 static char rcbt[22];
 struct tm*ts;
@@ -385,8 +403,8 @@ int main(int argc,char**argv){
 int n;
 char *currentcmd;
 
-if(argc<3){printf("THIS PROGRAM SHOULD BE EXECUTED BY CB3ROB AX25 BBS ONLY\n");exit(EXIT_FAILURE);};
-if(strcmp(argv[3],"CB3ROB-MUTINY-AX25-BBS")){printf("THIS PROGRAM SHOULD BE EXECUTED BY CB3ROB AX25 BBS ONLY\n");exit(EXIT_FAILURE);};
+if(argc!=4){printf("THIS PROGRAM SHOULD BE EXECUTED BY CB3ROB AX25 BBS ONLY\n");exit(EXIT_FAILURE);};
+if((strcmp(argv[3],"CB3ROB-MUTINY-AX25-BBS"))||(chkcall(argv[1])==-1)||(chkcall(argv[2])==-1)){printf("THIS PROGRAM SHOULD BE EXECUTED BY CB3ROB AX25 BBS ONLY\n");exit(EXIT_FAILURE);};
 if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
 
 login=time(NULL);
