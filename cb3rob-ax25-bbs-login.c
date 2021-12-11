@@ -412,6 +412,8 @@ while(1){//IF THE PARENT DIES WE DIE BY SIGNAL ANYWAY
 printprompt();
 currentcmd=getcommand();
 if(!bcmp(currentcmd,"#BIN#",5)){cmdautobin(currentcmd,user);continue;};//RELAY THE ENTIRE CMD LINE TO THE AUTOBIN PROGRAM
+for(n=0;currentcmd[n]!=0;n++)if(currentcmd[n]==0x5C)currentcmd[n]=0x2F;//FETCH STRINGLENGTH AND TRANSLATE PATHS
+if(n>0)for(n--;(n>=0)&&(currentcmd[n]==0x20);n--)currentcmd[n]=0;//REMOVE TRAILING SPACE WORKING BACKWARDS
 if(!bcmp(currentcmd,"CHDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdchdir((char*)currentcmd+5);continue;};
 if(!bcmp(currentcmd,"CD",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdchdir((char*)currentcmd+2);continue;};
 if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};

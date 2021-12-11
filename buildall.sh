@@ -1,11 +1,11 @@
 #!/bin/sh
-gcc -Wall -O3 -o cb3rob-ax25-bbs cb3rob-ax25-bbs.c -lutil
-gcc -Wall -O3 -o cb3rob-ax25-bbs-login cb3rob-ax25-bbs-login.c -lcrypt
-gcc -Wall -O3 -o cb3rob-ax25-bridge cb3rob-ax25-bridge.c
-gcc -Wall -O3 -o cb3rob-ax25-getty cb3rob-ax25-getty.c -lutil
-gcc -Wall -O3 -o cb3rob-axudp-attach cb3rob-axudp-attach.c
-gcc -Wall -O3 -o cb3rob-kiss-tcp-attach cb3rob-kiss-tcp-attach.c -lutil
-gcc -Wall -O3 -o cb3rob-kiss-tcp-multiplexer cb3rob-kiss-tcp-multiplexer.c
+gcc -O3 -o cb3rob-ax25-bbs cb3rob-ax25-bbs.c -lutil
+gcc -O3 -o cb3rob-ax25-bbs-login cb3rob-ax25-bbs-login.c -lcrypt
+gcc -O3 -o cb3rob-ax25-bridge cb3rob-ax25-bridge.c
+gcc -O3 -o cb3rob-ax25-getty cb3rob-ax25-getty.c -lutil
+gcc -O3 -o cb3rob-axudp-attach cb3rob-axudp-attach.c
+gcc -O3 -o cb3rob-kiss-tcp-attach cb3rob-kiss-tcp-attach.c -lutil
+gcc -O3 -o cb3rob-kiss-tcp-multiplexer cb3rob-kiss-tcp-multiplexer.c
 strip cb3rob-ax25-bbs
 strip cb3rob-ax25-bbs-login
 strip cb3rob-ax25-bridge
