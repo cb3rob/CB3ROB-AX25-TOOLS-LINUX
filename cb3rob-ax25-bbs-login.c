@@ -184,6 +184,9 @@ fclose(fp);
 gp=getgrnam("MUTINY");
 };//WHILE GP NULL
 
+//WE HAVE OUR GID
+gid=gp->gr_gid;
+
 pw=getpwnam(username);
 if(pw==NULL){
 char salt[3];
@@ -199,7 +202,7 @@ memset(&pwa,0,sizeof(struct passwd));
 pwa.pw_name=username;
 pwa.pw_passwd=crypt(username,salt);
 pwa.pw_dir=homedir;
-pwa.pw_gid=gp->gr_gid;
+pwa.pw_gid=gid;
 pwa.pw_shell="/bin/false";
 };//IF PW NULL
 while(pw==NULL){
@@ -211,39 +214,43 @@ putpwent(&pwa,fp);
 fclose(fp);
 pw=getpwnam(username);
 };//WHILE PW NULL
+
+//WE HAVE OUR UID TOO
 uid=pw->pw_uid;
-gid=pw->pw_gid;
+
 printf("FOUND USERDATA UID: %d GID: %d\r",uid,gid);
 printf("NO PASSWORD FOR USER: %s SET SO NOT ASKING\r",username);
 
+
 memset(&directory,0,sizeof(directory));
 //MAKE SURE THE SYSTEM IS INITIALIZED AND ALL DIRECTORIES EXIST (TAKES LONGER TO CHECK THAN TO JUST TRY TO CREATE THEM IF NOT ;)
-mkdir(basepath,00755);
-chmod(basepath,00755);//FORCE FIX PERMISSIONS ON EXISTING DIRECTORIES
+mkdir(basepath,00750);
+chmod(basepath,00750);//FORCE FIX PERMISSIONS ON EXISTING DIRECTORIES
+chown(basepath,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/ETC",basepath);
-mkdir(directory,00711);//NONE OF THE USERS CONCERN HERE
-chmod(directory,00711);
-chown(directory,0,0);
+mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE
+chmod(directory,00710);
+chown(directory,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/BIN",basepath);
-mkdir(directory,00711);//NONE OF THE USERS CONCERN HERE
-chmod(directory,00711);
-chown(directory,0,0);
+mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE
+chmod(directory,00710);
+chown(directory,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/UPLOAD",basepath);
-mkdir(directory,01755);//SET STICKY BIT - TEMP FILES DURING UPLOADS
-chmod(directory,01755);
-chown(directory,0,0);
+mkdir(directory,01750);//SET STICKY BIT - TEMP FILES DURING UPLOADS
+chmod(directory,01750);
+chown(directory,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/FILES",basepath);
-mkdir(directory,01755);//SET STICKY BIT - USERS CAN REMOVE FILES THEY UPLOADED
-chmod(directory,01755);
-chown(directory,0,0);
+mkdir(directory,01750);//SET STICKY BIT - USERS CAN REMOVE FILES THEY UPLOADED
+chmod(directory,01750);
+chown(directory,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/MEMBERS",basepath);
-mkdir(directory,00711);//NO LISTING THE OTHER CALLSIGNS
-chmod(directory,00711);
-chown(directory,0,0);
+mkdir(directory,00750);//NO LISTING THE OTHER CALLSIGNS
+chmod(directory,00750);
+chown(directory,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/MAIL",basepath);
-mkdir(directory,00711);//JUST YOUR OWN
-chmod(directory,00711);
-chown(directory,0,0);
+mkdir(directory,00710);//JUST YOUR OWN
+chmod(directory,00710);
+chown(directory,0,gid);
 memset(&directory,0,sizeof(directory));
 //GETPWNAM() TO SEE IF FIRST VISIT
 //ASK FOR PASSWORD IF SET, EXPLAIN HOW TO SET ONE IF NOT
