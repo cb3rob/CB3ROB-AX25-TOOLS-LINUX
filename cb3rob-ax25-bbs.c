@@ -219,7 +219,7 @@ ptychild=forkpty(&master,slavetty,&trm,&wins);
 if(ptychild==0){
 //CHILD (LOGIN)
 close(csock);csock=-1;//DON'T WANT THAT HERE
-char*loginargv[]={"/usr/sbin/cb3rob-ax25-bbs-login",sourcecall,destcall,NULL};
+char*loginargv[]={"/usr/sbin/cb3rob-ax25-bbs-login",sourcecall,destcall,"CB3ROB-MUTINY-AX25-BBS",NULL};
 char*loginenvp[]={"TERM=dumb",NULL};
 execve("/usr/sbin/cb3rob-ax25-bbs-login",&loginargv[0],&loginenvp[0]);
 exit(EXIT_SUCCESS);
