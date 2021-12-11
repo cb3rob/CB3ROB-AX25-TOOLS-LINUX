@@ -360,6 +360,11 @@ printf("CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
 //termraw();
 //};//CMDSHELL
 
+void cmdtest(){
+int n;
+for(n=0;n<100;n++)printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+};
+
 void cmdread(char*filename){
 int n;
 if(filename!=NULL){
@@ -417,12 +422,13 @@ if(n>0)for(n--;(n>=0)&&(currentcmd[n]==0x20);n--)currentcmd[n]=0;//REMOVE TRAILI
 if(!bcmp(currentcmd,"CHDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdchdir((char*)currentcmd+5);continue;};
 if(!bcmp(currentcmd,"CD",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdchdir((char*)currentcmd+2);continue;};
 if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};
+if(!strcmp(currentcmd,"TEST")){cmdtest(user);continue;};
 if(!strcmp(currentcmd,"BYE")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"EXIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"QUIT")){cmdbye(user);continue;};
+if(!strcmp(currentcmd,"SALIR")){cmdbye(user);continue;};
+if(!bcmp(currentcmd,"DISC",4)){cmdbye(user);continue;};//DISCONNECT IS GOOD WITH ANY ABBREVIATION
 if(!strcmp(currentcmd,"HELP")){cmdhelp();continue;};
-if(!strcmp(currentcmd,"SALIR")){cmdhelp();continue;};
-if(!bcmp(currentcmd,"DISC",4)){cmdhelp();continue;};//DISCONNECT IS GOOD WITH ANY ABBREVIATION
 if(!bcmp(currentcmd,"DIR",3))if((currentcmd[3]==0x20)||(currentcmd[3]==0)){cmddir((char*)currentcmd+3);continue;};
 //if(!strcmp(currentcmd,"GODMODE")){cmdshell();continue;};
 cmdinvalid();
