@@ -208,6 +208,11 @@ pwa.pw_shell="/bin/false";
 while(pw==NULL){
 printf("NO USERDATA FOUND FOR USERNAME %s - CREATING...\r",username);
 for(pwa.pw_uid=10000;getpwuid(pwa.pw_uid)!=NULL;pwa.pw_uid++);
+//EHM YEAH. SHOULD USE THE SAME FILE LOCKING AND TEMPORARY FILE MECHANISM passwd USES HERE..
+//BUT... STDIO BUFFERING... ETC.
+//ALSO WE COULD END UP WITH 2 USERS WITH THE SAME UID IF 2 ARE CREATED AT EXACTLY THE SAME TIME
+//THE EASIER OPTION IS TO JUST CONVERT THEIR CALLSIGN FROM THE MAX 6 DIGIT BASE 36 INTEGER THAT IT REALLY INTO A UID IS AND USE THAT
+//MOST SYSTEMS WILL HAVE LARGER THAN 16 BIT UID'S ANYWAY NOWADAYS. IT FITS A 32 BIT UID AND ENSURES UNIQUENESS.
 fp=fopen("/etc/passwd","a");
 putpwent(&pwa,fp);
 //putspent(
@@ -219,47 +224,51 @@ pw=getpwnam(username);
 uid=pw->pw_uid;
 
 printf("FOUND USERDATA UID: %d GID: %d\r",uid,gid);
+//WE'LL GET TO THIS LATER. THEY'RE SET TO THE USERS CALLSIGN WITHOUT SSID FOR NOW
+//WITH A SHELL THAT DENIES THEM ACCESS TO THE UNIX SHELL (COULD STILL GRANT THEM ACCCESS TO OTHER SERVICES!)
 printf("NO PASSWORD FOR USER: %s SET SO NOT ASKING\r",username);
 
 
 memset(&directory,0,sizeof(directory));
 //MAKE SURE THE SYSTEM IS INITIALIZED AND ALL DIRECTORIES EXIST (TAKES LONGER TO CHECK THAN TO JUST TRY TO CREATE THEM IF NOT ;)
-mkdir(basepath,00750);
+//SOOO MANY UNCHECKED RETURN VALUES... WHO CARES, GCC.. IT DOES IT UPON EVERY SINGLE LOGIN ANYWAY. AND IF THE DRIVE IS FULL IT'S FULL.
+mkdir(basepath,00750);//EVERYTHING EXCEPT FOR /BIN SHOULD ACTUALLY BE ON A FILESYSTEM MOUNTED WITH NO EXECUTE BUT WE CAN'T DO THAT FROM HERE
 chmod(basepath,00750);//FORCE FIX PERMISSIONS ON EXISTING DIRECTORIES
 chown(basepath,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/ETC",basepath);
-mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE
+mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE - DATA FILES TO BE READ BY THIS PROGRAM
 chmod(directory,00710);
 chown(directory,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/BIN",basepath);
-mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE
+mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE - EXTERNAL PROGRAMS TO BE CALLED BY THIS ONE
 chmod(directory,00710);
 chown(directory,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/UPLOAD",basepath);
 mkdir(directory,01750);//SET STICKY BIT - TEMP FILES DURING UPLOADS
-chmod(directory,01750);
-chown(directory,0,gid);
+chmod(directory,01750);//PROBABLY NONE OF THE USERS CONCERN. CONTAINS UNFINISHED TEMPORARY FILES
+chown(directory,0,gid);//MAYBE DO THIS WITH O_TMPFILE INSTEAD
 snprintf(directory,sizeof(directory)-1,"%s/FILES",basepath);
 mkdir(directory,01750);//SET STICKY BIT - USERS CAN REMOVE FILES THEY UPLOADED
 chmod(directory,01750);
 chown(directory,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/MEMBERS",basepath);
-mkdir(directory,00750);//NO LISTING THE OTHER CALLSIGNS
+mkdir(directory,00750);//USER HOMEDIRECTORIES
 chmod(directory,00750);
 chown(directory,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/MAIL",basepath);
-mkdir(directory,00710);//JUST YOUR OWN
-chmod(directory,00710);
+mkdir(directory,00750);//USER MAIL
+chmod(directory,00750);
 chown(directory,0,gid);
 memset(&directory,0,sizeof(directory));
-//GETPWNAM() TO SEE IF FIRST VISIT
-//ASK FOR PASSWORD IF SET, EXPLAIN HOW TO SET ONE IF NOT
-//ADD USER TO NIS/YP/PASSWD IF FIRST VISIT
+//SYSTEM HOMEDIR NAME OF USER GENERATED ABOVE IN THE USER CREATION PART
 mkdir(homedir,00700);
 chmod(homedir,00700);
 chown(homedir,uid,gid);
+//CHOWN OUR TTY TOO. MAYBE IT SHOULD HAVE GROUP TTY ON SOME SYSTEMS
 chown(line,uid,gid);
+//HOMEDIR NAME FOR USE WITHIN THE CHROOT
 snprintf(homedir,sizeof(homedir)-1,"/MEMBERS/%s",username);
+//CHROOT
 chroot(basepath);
 chdir(homedir);
 //DROP ROOT
@@ -278,18 +287,12 @@ sleep(10);
 exit(EXIT_SUCCESS);
 };//CMDBYE
 
-void cmdhello(char *username){
-printf("HELLO %s\r",username);
-};//CMDHELLO
-
 void cmdinvalid(){
 printf("INVALID COMMAND - TRY HELP\r");
 };//CMDINVALID
 
 void cmdhelp(){
-printf("HELLO - SAYS HELLO\r");
 printf("DIR   - LISTS FILES\r");
-printf("CHDIR - CHANGES DIRECTORY\r");
 printf("CD    - CHANGES DIRECTORY\r");
 printf("READ  - READS TEXT FILE\r");
 printf("EXIT  - TERMINATES SESSION\r");
@@ -389,7 +392,10 @@ line=ttyname(STDIN_FILENO);//DO THIS BEFORE CHROOT
 memset(user,0,sizeof(user));
 for(n=0;(n<sizeof(user)-1)&&(call[n])&&(call[n]!='-');n++)user[n]=call[n];
 
-//TURN OFF STDOUT BUFFERING TO USE PRINTF WITH CARRIAGE RETURN
+//TURN OFF STDOUT BUFFERING TO BE ABLE TO USE PRINTF WITH CARRIAGE RETURN
+//AS THE ONLY PLACE HERE WHERE IT WILL FIND THAT NEWLINE IT'S WAITING FOR IS BINARY TRANSFERS
+//WE'LL SIMPLY HAVE TO PRINTF() THE ENTIRE PACKET PAYLOAD IN ONE GO AS MUCH AS POSSIBLE, RESULTING IN ONE WRITE()
+//LINUX REFUSES TO SEE CARRIAGE RETURN AS A DELIMITER OF ANY KIND
 setbuf(stdout,NULL);
 
 //INITIALIZE TERMIOS
@@ -405,15 +411,16 @@ printf("\rREAD: %ld BYTES\r\r",readfile("/ETC/WELCOME.TXT",BPNLCR));
 while(1){//IF THE PARENT DIES WE DIE BY SIGNAL ANYWAY
 printprompt();
 currentcmd=getcommand();
-if(!bcmp(currentcmd,"#BIN#",5)){cmdautobin(currentcmd,user);continue;};
+if(!bcmp(currentcmd,"#BIN#",5)){cmdautobin(currentcmd,user);continue;};//RELAY THE ENTIRE CMD LINE TO THE AUTOBIN PROGRAM
 if(!bcmp(currentcmd,"CHDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdchdir((char*)currentcmd+5);continue;};
 if(!bcmp(currentcmd,"CD",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdchdir((char*)currentcmd+2);continue;};
 if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};
-if(!strcmp(currentcmd,"HELLO")){cmdhello(user);continue;};
 if(!strcmp(currentcmd,"BYE")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"EXIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"QUIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"HELP")){cmdhelp();continue;};
+if(!strcmp(currentcmd,"SALIR")){cmdhelp();continue;};
+if(!bcmp(currentcmd,"DISC"),4){cmdhelp();continue;};
 if(!bcmp(currentcmd,"DIR",3))if((currentcmd[3]==0x20)||(currentcmd[3]==0)){cmddir((char*)currentcmd+3);continue;};
 //if(!strcmp(currentcmd,"GODMODE")){cmdshell();continue;};
 cmdinvalid();
