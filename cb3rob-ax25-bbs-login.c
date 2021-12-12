@@ -308,6 +308,10 @@ snprintf(directory,sizeof(directory)-1,"%s/MAIL",basepath);
 mkdir(directory,00750);//USER MAIL
 chmod(directory,00750);
 chown(directory,0,gid);
+snprintf(directory,sizeof(directory)-1,"%s/ANARCHY",basepath);
+mkdir(directory,01770);//DO WHATEVER THEY LIKE
+chmod(directory,01770);
+chown(directory,0,gid);
 memset(&directory,0,sizeof(directory));
 //SYSTEM HOMEDIR NAME OF USER GENERATED ABOVE IN THE USER CREATION PART
 mkdir(homedir,00700);
