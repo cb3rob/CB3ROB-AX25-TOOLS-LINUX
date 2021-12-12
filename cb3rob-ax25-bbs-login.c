@@ -19,9 +19,9 @@
 #define BPNLCR 1
 
 time_t login;
-char *node;
-char *call;
-char *line;
+char*node;
+char*call;
+char*line;
 char user[7];
 uid_t uid;
 gid_t gid;
@@ -33,7 +33,37 @@ struct termios trmraw;
 
 char homedir[256];
 
-int chkcall(char *c){
+//ALLOWS 8.3 FILENAMES WITH A-Z0-9 AND NOTHING ELSE
+//FOR MKDIR AND FILE WRITES ONLY... DOESN'T ALLOW RELATIVE PATHS
+int chkpath(char*path){
+int remain;
+int dotcount;
+if(path==NULL)return(-1);
+if(path[0]==0)return(-1);
+//INIT
+remain=8;
+dotcount=0;
+//SKIP LEADING SLASH NEUTRALLY
+if(path[0]=='/')path++;//SKIP LEADING SINGLE SLASH
+while(path[0]){//CONTINUE UNTIL END OF STRING
+if((remain==8)&&(path[0]=='.'))return(-1);//NO DOTS AS FIRST CHARACTER
+if((remain==8)&&(path[0]=='/'))return(-1);//NO DOUBLE SLASHES EITHER
+if(path[0]=='/'){remain=8;dotcount=0;path++;continue;};
+if(path[0]=='.'){remain=3;dotcount++;path++;};
+if(remain==0)return(-1);//TOO LONG
+if(dotcount>1)return(-1);//TOO LONG
+//THIS WILL ALSO FETCH ANY . OR / IMMEDIATELY FOLLOWING ANOTHER . OR /
+if(path[0]){//EOL?
+if((path[0]<0x30)||(path[0]>0x5A)||((path[0]>0x39)&&(path[0]<0x41)))return(-1);
+//ONLY INCREMENT IF WE HAVEN'T REACHED END OF LINE YET
+remain--;
+path++;
+};//EOL CHECK
+};//WHILE PATH
+return(0);
+};//CHKPATH
+
+int chkcall(char*c){
 int n;
 if(c==NULL)return(-1);
 if((c[0]<0x30)||(c[0]>0x5A)||((c[0]>0x39)&&(c[0]<0x41)))return(-1);//MUST START WITH A-Z0-9
@@ -62,7 +92,7 @@ snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,t
 return(rcbt);
 };//SRCBTIME
 
-ssize_t readfile(const char *filename,int asciimode){
+ssize_t readfile(const char*filename,int asciimode){
 uint8_t rbuf[512];
 int ffd;
 ssize_t rbytes;
@@ -142,7 +172,7 @@ printf("\rCOMMAND: %s\r",cmd);//PRINT IT IN CASE USER HAS ECHO OFF IN HIS TERMIN
 return((char*)&cmd);
 };//GETCOMMAND
 
-int inituser(char *username){
+int inituser(char*username){
 char directory[256];
 char basepath[]="/var/bbs";
 struct rlimit rlim;
@@ -299,7 +329,7 @@ seteuid(uid);
 return(0);
 };//INITUSER;
 
-int cmdbye(char *username){
+int cmdbye(char*username){
 printf("SEE YOU AGAIN SOON %s\r",username);
 sync();
 sleep(10);
@@ -317,7 +347,7 @@ printf("READ  - READS TEXT FILE\r");
 printf("EXIT  - TERMINATES SESSION\r");
 };//CMDHELP
 
-int cmddir(char *dirname){
+int cmddir(char*dirname){
 DIR*curdir;
 struct dirent*direntry;
 struct stat filestat;
@@ -372,6 +402,29 @@ if(chdir(dir))printf("CHDIR TO %s FAILED\r",dir);
 printf("CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
 };//CMDCHDIR
 
+void cmdmkdir(char*dir){
+int n;
+if(dir!=NULL){
+for(n=0;dir[n]==0x20;n++);
+dir=dir+n;//STRIP LEADING SPACE
+if(chkpath(dir)==-1)printf("INVALID ABSOLUTE 8.3 FORMAT [A-Z 0-9] PATH: %s\r",dir);
+else if(mkdir(dir,00750))printf("CREATE DIRECTORY %s FAILED\r",dir);
+else chdir(dir);//WE CD INTO IT DIRECTLY
+printf("CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
+};//IF PARAMETERS
+};//CMDMKDIR
+
+void cmderase(char*path){
+int n;
+if(path!=NULL){
+for(n=0;path[n]==0x20;n++);
+path=path+n;//STRIP LEADING SPACE
+if(chkpath(path)==-1)printf("INVALID ABSOLUTE 8.3 FORMAT [A-Z 0-9] PATH: %s\r",path);
+else if(remove(path))printf("ERASE %s FAILED\r",path);
+printf("CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
+};//IF PARAMETERS
+};//CMDERASE
+
 //void cmdshell(){
 //NO WORKY IN CHROOT... PROBABLY THE COPIED SHELL IS NOT STATIC COMPILED
 //termorg();
@@ -393,7 +446,7 @@ if(filename[0])printf("\rREAD: %ld BYTES\r\r",readfile(filename,BPNLCR));else pr
 };//IF PARAMETERS
 };//CMDCHDIR
 
-void cmdautobin(char *bincmd,char*username){
+void cmdautobin(char*bincmd,char*username){
 printf("\r#ABORT#\r");
 sync();
 sleep(2);
@@ -402,7 +455,7 @@ printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r");
 
 int main(int argc,char**argv){
 int n;
-char *currentcmd;
+char*currentcmd;
 
 if(argc!=4){printf("THIS PROGRAM SHOULD BE EXECUTED BY CB3ROB AX25 BBS ONLY\n");exit(EXIT_FAILURE);};
 if((strcmp(argv[3],"CB3ROB-MUTINY-AX25-BBS"))||(chkcall(argv[1])==-1)||(chkcall(argv[2])==-1)){printf("THIS PROGRAM SHOULD BE EXECUTED BY CB3ROB AX25 BBS ONLY\n");exit(EXIT_FAILURE);};
@@ -442,6 +495,12 @@ for(n=0;currentcmd[n]!=0;n++)if(currentcmd[n]==0x5C)currentcmd[n]=0x2F;//FETCH S
 if(n>0)for(n--;(n>=0)&&(currentcmd[n]==0x20);n--)currentcmd[n]=0;//REMOVE TRAILING SPACE WORKING BACKWARDS
 if(!bcmp(currentcmd,"CHDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdchdir((char*)currentcmd+5);continue;};
 if(!bcmp(currentcmd,"CD",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdchdir((char*)currentcmd+2);continue;};
+if(!bcmp(currentcmd,"MKDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdmkdir((char*)currentcmd+5);continue;};
+if(!bcmp(currentcmd,"MD",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdmkdir((char*)currentcmd+2);continue;};
+if(!bcmp(currentcmd,"ERASE",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmderase((char*)currentcmd+5);continue;};
+if(!bcmp(currentcmd,"DEL",3))if((currentcmd[3]==0x20)||(currentcmd[3]==0)){cmderase((char*)currentcmd+3);continue;};
+if(!bcmp(currentcmd,"RMDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmderase((char*)currentcmd+5);continue;};
+if(!bcmp(currentcmd,"RM",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmderase((char*)currentcmd+2);continue;};
 if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};
 if(!strcmp(currentcmd,"TEST")){cmdtest(user);continue;};
 if(!strcmp(currentcmd,"BYE")){cmdbye(user);continue;};
