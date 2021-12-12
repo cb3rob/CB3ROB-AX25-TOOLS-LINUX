@@ -168,7 +168,7 @@ void termclient(int csock,int master,pid_t ptychild){
 printf("%s CLIENT %d TERMINATING\n",srcbtime(0),getpid());
 memset(&tbuf,0,sizeof(tbuf));
 if(csock!=-1){printf("%s CLIENT %d CLOSING SOCKET %d\n",srcbtime(0),getpid(),csock);close(csock);csock=-1;};
-//KILL LOGIN BEFORE CLOSING MASTER OR LOGIN WILL CAUSE SEGV UPON I/O TO CLOSED PTY
+//KILL LOGIN BEFORE CLOSING MASTER
 if(ptychild!=-1){printf("%s CLIENT %d KILLING LOGIN %d\n",srcbtime(0),getpid(),ptychild);kill(ptychild,SIGTERM);sleep(10);kill(ptychild,SIGKILL);ptychild=-1;};
 if(master!=-1){printf("%s CLIENT %d CLOSING MASTER %d\n",srcbtime(0),getpid(),master);close(master);master=-1;};
 printf("%s CLIENT %d TERMINATED\n",srcbtime(0),getpid());
