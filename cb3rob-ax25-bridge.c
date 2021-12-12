@@ -176,9 +176,12 @@ tv.tv_usec=0;
 FD_SET(sock,&readfds);
 select(sock+1,&readfds,NULL,NULL,&tv);
 clen=sizeof(struct sockaddr_ll);
+//ACTUALLY NEED THE FD_ISSET BECAUSE SELECT WILL FALL THROUGH AFTER THE TIMER,
+//SOCK IS IN BLOCKING MODE AND READ WILL OTHERWISE NEVER FALL THROUGH TO CHECK
+//THE RELOAD TIMER AND CALL GETINTERFACES AGAIN IN LONG TIMES OF INACTIVITY
+if(FD_ISSET(sock,&readfds)){
 bytes=recvfrom(sock,&buf,sizeof(buf),0,(struct sockaddr*)&ssockaddrll,&clen);
-
-//DEBUG PACKET
+//SHORT PACKET
 if(bytes<16)continue;
 pctr=buf;
 //KISS byte
@@ -187,17 +190,14 @@ pctr++;
 if(ssockaddrll.sll_protocol!=htons(ETH_P_AX25))continue;
 if(ssockaddrll.sll_family!=AF_PACKET)continue;
 if(ssockaddrll.sll_hatype!=ARPHRD_AX25)continue;
-
 printf("====================\n");
 printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),displaycall(pctr));
 pctr+=AXALEN;
 //SRC ADDR
 printf("FROM: %s SIZE: %ld\n",displaycall(pctr),bytes);
-
 dsockaddrll.sll_family=ssockaddrll.sll_family;
 dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
 dsockaddrll.sll_hatype=ssockaddrll.sll_hatype;
-
 for(po=0;po<portcount;po++){
 //NOT BRIDGING TO SOURCE INTERFACE
 if(myinterfaces[po].ifindex==ssockaddrll.sll_ifindex)continue;
@@ -205,15 +205,12 @@ if(myinterfaces[po].ifindex==ssockaddrll.sll_ifindex)continue;
 if(!(myinterfaces[po].status&(IFF_UP|IFF_RUNNING))){needreload=1;continue;};
 //ALL FINE, FORWARD PACKET
 printf("%s FORWARDING PACKET OVER INTERFACE %s (%d) TO %s\n",srcbtime(0),myinterfaces[po].ifname,myinterfaces[po].ifindex,displaycall(buf+1));
-
 dsockaddrll.sll_ifindex=myinterfaces[po].ifindex;
-
 if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,sizeof(struct sockaddr_ll))==-1){perror("SENDTO");needreload=1;continue;};
 };//FOR FORWARD PACKET TO EACH INTERFACE THAT WAS UP AT PROGRAM START IT DID NOT ORIGINATE FROM
-
+};//FD_SET
 //RELOAD EVERY 2 MINUTES ANYWAY
 if(lastreload<(time(NULL)-120))needreload=1;
-
 };//WHILE 1
 };//MAIN
 
