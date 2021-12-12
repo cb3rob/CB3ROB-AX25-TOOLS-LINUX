@@ -175,6 +175,33 @@ printf("%s CLIENT %d TERMINATED\n",srcbtime(0),getpid());
 exit(EXIT_SUCCESS);
 };//TERMCLIENT
 
+//SEND BEACON TO KEEP DYNAMIC ROUTES TO US OPEN IN TIMES OF INACTIVITY
+void sendbeacon(int signum){
+int beacon;
+char btext[]="MUTINY BBS\r";
+struct full_sockaddr_ax25 beaconaddr;
+printf("%s SENDING BEACON\n",srcbtime(0));
+//ACTUALLY CANNOT SIMPY ABUSE SEQPACKET bsock FOR THIS - TRANSPORT ENDPOINT ALREADY CONNECTED
+beacon=socket(PF_AX25,SOCK_DGRAM|SOCK_NONBLOCK,0);
+if(beacon!=-1){
+//WE CAN HOWEVER RECYCLE IT'S BIND SOCKADDR
+if(bind(beacon,(struct sockaddr*)&baddr,sizeof(struct full_sockaddr_ax25))!=-1){
+memset(&beaconaddr,0,sizeof(struct full_sockaddr_ax25));
+beaconaddr.fsa_ax25.sax25_family=AF_AX25;
+beaconaddr.fsa_ax25.sax25_call.ax25_call[0]=('Q'<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[1]=('S'<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[2]=('T'<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[3]=(' '<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[4]=(' '<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[5]=(' '<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[6]=(0x00<<1);
+beaconaddr.fsa_ax25.sax25_ndigis=0;
+if(sendto(beacon,btext,strlen(btext),MSG_DONTWAIT,(struct sockaddr*)&beaconaddr,sizeof(struct full_sockaddr_ax25))>0)printf("%s SENT BEACON\n",srcbtime(0));
+};//IF BIND
+close(beacon);
+};//IF SOCKET
+};//BEACON
+
 int clientcode(){
 //FORK CHILD
 ssize_t bytes;
@@ -294,7 +321,7 @@ bsock=-1;setupsock(argv[1],argv[2]);
 while(1){
 FD_ZERO(&readfds);//BSOCK CHANGES IF INTERFACE CHANGES
 FD_SET(bsock,&readfds);
-tv.tv_sec=600;
+tv.tv_sec=300;//ALSO BEACON TIME
 tv.tv_usec=0;
 printf("%s WAIT FOR CLIENT\n",srcbtime(0));
 select(bsock+1,&readfds,NULL,NULL,&tv);
@@ -304,5 +331,7 @@ csock=accept(bsock,(struct sockaddr*)&caddr,&clen);
 if(csock==-1)setupsock(argv[1],argv[2]);
 if(csock!=-1){if(fork()==0){close(bsock);clientcode();}else{close(csock);};};//FORK CHILD AND CLOSE CLIENTSOCK IN PARENT
 };//CLIENT IN QUEUE
+//BEACON REQUIRES A FILLED OUT BADDR STRUCT
+if((tv.tv_sec==0)&&(tv.tv_usec==0))sendbeacon(0);
 };//WHILE 1 ACCEPT
 };//MAIN
