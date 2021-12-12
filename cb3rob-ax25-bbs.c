@@ -317,6 +317,8 @@ signal(SIGQUIT,SIG_IGN);
 signal(SIGCHLD,SIG_IGN);//PARENT DOESN'T CARE
 
 bsock=-1;setupsock(argv[1],argv[2]);
+//SEND FIRST BEACON IMMEDIATELY AFTER STARTUP
+sendbeacon(0);
 
 while(1){
 FD_ZERO(&readfds);//BSOCK CHANGES IF INTERFACE CHANGES
@@ -332,6 +334,8 @@ if(csock==-1)setupsock(argv[1],argv[2]);
 if(csock!=-1){if(fork()==0){close(bsock);clientcode();}else{close(csock);};};//FORK CHILD AND CLOSE CLIENTSOCK IN PARENT
 };//CLIENT IN QUEUE
 //BEACON REQUIRES A FILLED OUT BADDR STRUCT
+//WILL BE SENT WHENEVER THERE ARE NO NEW CONNECTS DURING THE SELECT TIME...
+//MAYBE CHANGE TO WATCHDOG TIMER SIGNAL HANDLER FOR ANY NETWORK ACTIVITY
 if((tv.tv_sec==0)&&(tv.tv_usec==0))sendbeacon(0);
 };//WHILE 1 ACCEPT
 };//MAIN
