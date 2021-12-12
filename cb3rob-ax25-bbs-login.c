@@ -341,10 +341,15 @@ printf("INVALID COMMAND - TRY HELP\r");
 };//CMDINVALID
 
 void cmdhelp(){
-printf("DIR   - LISTS FILES\r");
-printf("CD    - CHANGES DIRECTORY\r");
-printf("READ  - READS TEXT FILE\r");
-printf("EXIT  - TERMINATES SESSION\r");
+printf("DIR  [PATH]  - LISTS FILES\r");
+printf("CD   [PATH]  - CHANGES DIRECTORY\r");
+printf("MD   <PATH>  - CREATES DIRECTORY\r");
+printf("RM   <PATH>  - REMOVES FILE OR EMPTY DIRECTORY\r");
+printf("READ <PATH>  - READS TEXT FILE\r");
+printf("EXIT         - TERMINATES SESSION\r");
+printf("\rPATHNAMES ARE 8.3 FORMAT [ A-Z 0-9 ]\r");
+//printf("AUTOBIN UPLOADS CAN BE STARTED WHILE ON THE PROMPT\r");
+//prrint("UPLOADS TO YOUR HOMEDIR OR /FILES OR /ANARCHY ONLY\r");
 };//CMDHELP
 
 int cmddir(char*dirname){
