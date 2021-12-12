@@ -1,4 +1,11 @@
 #!/bin/sh
+rm -f cb3rob-ax25-bbs
+rm -f cb3rob-ax25-bbs-login
+rm -f cb3rob-ax25-bridge
+rm -f cb3rob-ax25-getty
+rm -f cb3rob-axudp-attach
+rm -f cb3rob-kiss-tcp-attach
+rm -f cb3rob-kiss-tcp-multiplexer
 gcc -Wall -O3 -o cb3rob-ax25-bbs cb3rob-ax25-bbs.c -lutil
 gcc -Wall -O3 -o cb3rob-ax25-bbs-login cb3rob-ax25-bbs-login.c -lcrypt
 gcc -Wall -O3 -o cb3rob-ax25-bridge cb3rob-ax25-bridge.c

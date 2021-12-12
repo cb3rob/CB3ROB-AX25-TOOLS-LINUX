@@ -45,7 +45,8 @@ if(c[n++]!=0x2D)return(-1);//SOMETHING INVALID
 if((c[n]<0x30)||(c[n]>0x39))return(-1);//MUST BE 0-9
 n++;
 if(c[n]==0)return(n);//DONE - VALID WITH 1 DIGIT SSID
-if((c[n]<0x30)||(c[n]>0x36))return(-1);//MUST START WITH A-Z0-9
+if(c[n-1]!=0x31)return(-1);//IF WE HAVE ANOTHER SSID-DIGIT THE FIRST DIGIT MUST BE 1
+if((c[n]<0x30)||(c[n]>0x35))return(-1);//MUST BE 0-5
 n++;
 if(c[n]==0)return(n);//NO SSID
 return(-1);//FALLTHROUGH INVALID
