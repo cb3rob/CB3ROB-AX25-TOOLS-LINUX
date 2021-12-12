@@ -181,7 +181,7 @@ clen=sizeof(struct sockaddr_ll);
 //THE RELOAD TIMER AND CALL GETINTERFACES AGAIN IN LONG TIMES OF INACTIVITY
 if(FD_ISSET(sock,&readfds)){
 bytes=recvfrom(sock,&buf,sizeof(buf),0,(struct sockaddr*)&ssockaddrll,&clen);
-//SHORT PACKET
+//SHORT PACKET (NOT AX.25)
 if(bytes<16)continue;
 pctr=buf;
 //KISS byte
@@ -213,4 +213,3 @@ if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,sizeof(struct sockadd
 if(lastreload<(time(NULL)-120))needreload=1;
 };//WHILE 1
 };//MAIN
-
