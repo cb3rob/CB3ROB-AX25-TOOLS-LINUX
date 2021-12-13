@@ -28,6 +28,7 @@ gid_t gid;
 
 struct timeval tv;
 fd_set readfds;
+fd_set writefds;
 int nfds;
 
 struct termios trmorgin;
@@ -484,6 +485,8 @@ select(STDIN_FILENO+1,&readfds,NULL,NULL,&tv);
 if(FD_ISSET(STDIN_FILENO,&readfds))if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
 for(n=0;(n<(sizeof(buf)-5))&&(buf[n]!='#');n++);//SET N TO OFFSET OF FIRST #
 if(!bcmp(&buf+n,"#NO#",4)){close(ffd);printf("BSEND %s REFUSED BY PEER\r\r",name);return(-1);};
+//GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
+if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BSEND %s REFUSED BY PEER\r\r",name);return(-1);};
 if(!bcmp(&buf+n,"#OK#",4))break;
 };//HANDLE OK OR NOT OK
 };//WAIT FOR #OK# OR #NO#
@@ -496,14 +499,18 @@ while(remain>0){
 tv.tv_sec=10;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
+FD_ZERO(&writefds);
 FD_SET(STDIN_FILENO,&readfds);
+FD_SET(STDOUT_FILENO,&writefds);
 FD_SET(ffd,&readfds);
-nfds=STDIN_FILENO;if(ffd>STDIN_FILENO)nfds=ffd;
-select(nfds+1,&readfds,NULL,NULL,&tv);
+nfds=STDIN_FILENO;
+if(STDOUT_FILENO>nfds)nfds=STDOUT_FILENO;
+if(ffd>nfds)nfds=ffd;
+select(nfds+1,&readfds,&writefds,NULL,&tv);
 //HANDLE ABORT, IGNORE ANYTHING ELSE, AS PER SPECIFICATION
 if(FD_ISSET(STDIN_FILENO,&readfds))while(read(STDIN_FILENO,&buf,1)==1)if(buf[0]=='#')if(read(STDIN_FILENO,&buf+1,6)==6)if(!bcmp(&buf,"#ABORT#",7)){close(ffd);printf("BSEND: %s ABORTED BY PEER\r\r",name);return(-1);};
 //SEND DATA
-if(FD_ISSET(ffd,&readfds)){
+if(FD_ISSET(ffd,&readfds)&&FD_ISSET(STDOUT_FILENO,&writefds)){
 rbytes=read(ffd,&buf,sizeof(buf));
 if(rbytes<1){close(ffd);write(STDOUT_FILENO,"\r#ABORT#\r",9);printf("BSEND ABORTED: %s FILE READ ERROR\r\r",name);return(-1);};
 remain-=rbytes;

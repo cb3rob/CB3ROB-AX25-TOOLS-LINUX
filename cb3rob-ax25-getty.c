@@ -230,16 +230,19 @@ exit(EXIT_SUCCESS);
 //PARENT (DATA RELAY)
 if(fcntl(master,F_SETFL,O_NONBLOCK)==-1)exit(EXIT_FAILURE);
 FD_ZERO(&readfds);
+FD_ZERO(&writefds);
 while(waitpid(ptychild,NULL,WNOHANG)!=ptychild){
 FD_SET(master,&readfds);
+FD_SET(master,&writefds);
 FD_SET(csock,&readfds);
+FD_SET(csock,&writefds);
 tv.tv_sec=600;
 tv.tv_usec=0;
 nfds=master;if(csock>master)nfds=csock;
 select(nfds+1,&readfds,NULL,NULL,&tv);
 
 //BYTES FROM PROGRAM
-if(FD_ISSET(master,&readfds)){
+if(FD_ISSET(master,&readfds)&&FD_ISSET(csock,&writefds)){
 //STICK TO MTU SIZE - TBUF IS ONE LONGER FOR TRAILING ZERO ON STRINGS INTERNALLY
 bytes=read(master,&tbuf,sizeof(tbuf));
 if(bytes<1)termclient(csock,master,ptychild);
@@ -252,7 +255,7 @@ if(sendclient(&tbuf,bytes)<1)termclient(csock,master,ptychild);
 };//FD SET
 
 //BYTES TO PROGRAM
-if(FD_ISSET(csock,&readfds)){
+if(FD_ISSET(csock,&readfds)&&FD_ISSET(master,&writefds)){
 bytes=recv(csock,&tbuf,sizeof(tbuf),0);
 if(bytes<1)termclient(csock,master,ptychild);
 if(bytes>0){
