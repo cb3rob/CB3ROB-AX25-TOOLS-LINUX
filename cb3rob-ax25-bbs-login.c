@@ -164,6 +164,8 @@ int n;
 memset(&cmd,0,sizeof(cmd));
 //BLOCKING MODE?!. IT'D BETTER BE BLOCKING.
 if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK))return(NULL);
+//STDOUT TOO (PTYS CAN GET 'FULL')
+if(fcntl(STDOUT_FILENO,F_SETFL,fcntl(STDOUT_FILENO,F_GETFL,0)&~O_NONBLOCK))return(NULL);
 for(n=0;n<sizeof(cmd)-1;n++){
 if(read(STDIN_FILENO,(void*)&cmd+n,1)!=1)return(NULL);
 if((cmd[n]>=0x61)&&(cmd[n]<=0x7A))cmd[n]&=0xDF;//ALL TO UPPER CASE
@@ -350,12 +352,13 @@ printf("INVALID COMMAND - TRY HELP\r\r");
 };//CMDINVALID
 
 void cmdhelp(){
-printf("DIR  [PATH]  - LISTS FILES\r");
-printf("CD   [PATH]  - CHANGES DIRECTORY\r");
-printf("MD   <PATH>  - CREATES DIRECTORY\r");
-printf("RM   <PATH>  - REMOVES FILE OR EMPTY DIRECTORY\r");
-printf("READ <PATH>  - READS TEXT FILE\r");
-printf("EXIT         - TERMINATES SESSION\r");
+printf("DIR   [PATH]  - LISTS FILES\r");
+printf("CD    [PATH]  - CHANGES DIRECTORY\r");
+printf("MD    <PATH>  - CREATES DIRECTORY\r");
+printf("RM    <PATH>  - REMOVES FILE OR EMPTY DIRECTORY\r");
+printf("READ  <PATH>  - READS TEXT FILE\r");
+printf("BGET  <PATH>  - DOWNLOAD FILE USING THE #BIN# PROTOCOL\r");
+printf("EXIT          - TERMINATES SESSION\r");
 printf("\rPATHNAMES ARE 8.3 FORMAT [ A-Z 0-9 ]\r\r");
 //printf("AUTOBIN UPLOADS CAN BE STARTED WHILE ON THE PROMPT\r");
 //prrint("UPLOADS TO YOUR HOMEDIR OR /FILES OR /ANARCHY ONLY\r");
@@ -451,7 +454,7 @@ int n;
 for(n=0;n<100;n++)printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 };//CMDTEST
 
-ssize_t cmdbsend(char*name){
+ssize_t cmdbget(char*name){
 int n;
 int ffd;
 ssize_t rbytes;
@@ -484,14 +487,14 @@ FD_SET(STDIN_FILENO,&readfds);
 select(STDIN_FILENO+1,&readfds,NULL,NULL,&tv);
 if(FD_ISSET(STDIN_FILENO,&readfds))if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
 for(n=0;(n<(sizeof(buf)-5))&&(buf[n]!='#');n++);//SET N TO OFFSET OF FIRST #
-if(!bcmp(&buf+n,"#NO#",4)){close(ffd);printf("BSEND %s REFUSED BY PEER\r\r",name);return(-1);};
+if(!bcmp(&buf+n,"#NO#",4)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
 //GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
-if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BSEND %s REFUSED BY PEER\r\r",name);return(-1);};
+if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
 if(!bcmp(&buf+n,"#OK#",4))break;
 };//HANDLE OK OR NOT OK
 };//WAIT FOR #OK# OR #NO#
-//PEER HAS TO ACCEPT WITHIN 1 MINUTE
-if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);write(STDOUT_FILENO,"\r#ABORT#\r",9);printf("BSEND: %s TIMED OUT\r\r",name);return(-1);};
+//PEER HAS TO ACCEPT WITHIN 1 MINUTE - ALSO AT LEAST TRY TO FORCE THE PTY TO SEND THE ABORT IN IT'S VERY OWN PACKET AS PER DOCUMENTATION...
+if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);sync();write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();printf("BGET: %s TIMED OUT\r\r",name);return(-1);};
 //MOVE TOTAL BYTES TO TRANSFER INTO SUBSTRACTION REGISTER
 remain=statbuf.st_size;
 //WHILE BYTES TO SEND LEFT, SEND BLOCKS OF DATA
@@ -508,22 +511,24 @@ if(STDOUT_FILENO>nfds)nfds=STDOUT_FILENO;
 if(ffd>nfds)nfds=ffd;
 select(nfds+1,&readfds,&writefds,NULL,&tv);
 //HANDLE ABORT, IGNORE ANYTHING ELSE, AS PER SPECIFICATION
-if(FD_ISSET(STDIN_FILENO,&readfds))while(read(STDIN_FILENO,&buf,1)==1)if(buf[0]=='#')if(read(STDIN_FILENO,&buf+1,6)==6)if(!bcmp(&buf,"#ABORT#",7)){close(ffd);printf("BSEND: %s ABORTED BY PEER\r\r",name);return(-1);};
-//SEND DATA
+if(FD_ISSET(STDIN_FILENO,&readfds))while(read(STDIN_FILENO,&buf,1)==1)if(buf[0]=='#')if(read(STDIN_FILENO,&buf+1,6)==6)if(!bcmp(&buf,"#ABORT#",7)){close(ffd);printf("BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
+//SEND DATA - AND YES WE MUST CHECK IF THE PTY IS READY TO TAKE IT OR THINGS GO REALLY BONKERS
 if(FD_ISSET(ffd,&readfds)&&FD_ISSET(STDOUT_FILENO,&writefds)){
 rbytes=read(ffd,&buf,sizeof(buf));
-if(rbytes<1){close(ffd);write(STDOUT_FILENO,"\r#ABORT#\r",9);printf("BSEND ABORTED: %s FILE READ ERROR\r\r",name);return(-1);};
+if(rbytes<1){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BGET ABORTED: %s FILE READ ERROR\r\r",name);return(-1);};
 remain-=rbytes;
 wbytes=write(STDOUT_FILENO,&buf,rbytes);
-if(wbytes<rbytes){close(ffd);write(STDOUT_FILENO,"\r#ABORT#\r",9);printf("BSEND ABORTED: %s DATA TRANSMIT ERROR\r\r",name);return(-1);};
+if(wbytes<rbytes){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BGET ABORTED: %s DATA TRANSMIT ERROR\r\r",name);return(-1);};
 };//FDISSET FILE
+//BANGING THE CPU A BIT HERE IF THE PTY IS -NOT- READY TO ACCEPT MORE DATA (STDOUT -> PTY (BUFFER) -> MASTER -> SENDCLIENT() (BUFFER TO SLOW NETWORK) -> USUALLY SLLOOWWW CLIENT ALSO TRYING TO CRC IT)
+if(!FD_ISSET(STDOUT_FILENO,&writefds))sleep(1);//HAVE CPU DO OTHER THINGS. THIS WHOLE THING IS SINGLE TASKING ANYWAY.
 };//WHILE DATA LEFT TO SEND
 close(ffd);
 //STDIN BACK TO BLOCKING MODE TO BE SURE
 if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK)){printf("SYSTEM ERROR\r");};
 printf("\rBINSEND FILE: %s BYTES: %ld\r\r",name,statbuf.st_size);
 return(statbuf.st_size);
-};//CMDBSEND
+};//CMDBGET
 
 void cmdread(char*name){
 int n;
@@ -599,7 +604,7 @@ if(!bcmp(currentcmd,"RM",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdera
 //READ ASCII
 if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};
 //READ BIN
-if(!bcmp(currentcmd,"BSEND",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdbsend((char*)currentcmd+5);continue;};
+if(!bcmp(currentcmd,"BGET",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdbget((char*)currentcmd+5);continue;};
 //TRANSFER TEST
 if(!strcmp(currentcmd,"TEST")){cmdtest(user);continue;};
 //DISCONNECT

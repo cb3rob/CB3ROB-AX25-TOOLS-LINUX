@@ -239,7 +239,7 @@ FD_SET(csock,&writefds);
 tv.tv_sec=600;
 tv.tv_usec=0;
 nfds=master;if(csock>master)nfds=csock;
-select(nfds+1,&readfds,NULL,NULL,&tv);
+select(nfds+1,&readfds,&writefds,NULL,&tv);
 
 //BYTES FROM PROGRAM
 if(FD_ISSET(master,&readfds)&&FD_ISSET(csock,&writefds)){
