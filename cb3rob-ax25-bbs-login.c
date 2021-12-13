@@ -99,7 +99,7 @@ ssize_t rbytes;
 ssize_t wbytes;
 ssize_t total;
 int n;
-if(filename==NULL)return(0);
+if(filename==NULL)return(-1);
 ffd=open(filename,O_RDONLY,O_NONBLOCK|O_SYNC);
 if(ffd==-1)return(-1);
 total=0;
