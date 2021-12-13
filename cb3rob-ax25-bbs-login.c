@@ -109,7 +109,7 @@ if(ffd==-1)return(-1);
 total=0;
 wbytes=0;
 rbytes=0;
-while((rbytes=read(ffd,buf,sizeof(buf)))>1){
+while((rbytes=read(ffd,&buf,sizeof(buf)))>1){
 if(asciimode&BPNLCR)for(n=0;n<rbytes;n++)if(buf[n]=='\n')buf[n]='\r';
 if((wbytes=write(STDOUT_FILENO,&buf,rbytes))<1)break;
 sync();
@@ -455,13 +455,13 @@ int n;
 int ffd;
 ssize_t rbytes;
 ssize_t wbytes;
-ssize_t rtotal;
+ssize_t remain;
 struct stat statbuf;
 uint8_t buf[128];
-if(name!=NULL){
+if(name==NULL)return(-1);
 for(n=0;name[n]==0x20;n++);
 name=name+n;//STRIP LEADING SPACE
-if(name[0]){
+if(!name[0])return(-1);
 //MAKE SURE STDIN IS IN NON BLOCKING MODE
 if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)|O_NONBLOCK)){printf("SYSTEM ERROR\r\r");return(-1);};
 while(read(STDIN_FILENO,&buf,sizeof(buf))>0);//FLUSH STDIN TO MAKE SURE PEERS #OK# IS AT THE START OF RECEPTION
@@ -472,7 +472,7 @@ if(ffd==-1){printf("ERROR OPENING: %s\r\r",name);return(-1);};
 if(fstat(ffd,&statbuf)==-1){close(ffd);printf("SYSTEM ERROR\r\r");return(-1);};
 if((!(statbuf.st_mode&S_IFMT&S_IFREG))||(statbuf.st_size==0)){close(ffd);printf("ERROR OPENING: %s\r\r",name);return(-1);};
 //START OUR SIDE
-sprintf(buf,"#BIN#%lu\r",statbuf.st_size);
+sprintf((char*)&buf,"#BIN#%lu\r",statbuf.st_size);
 write(STDOUT_FILENO,&buf,strlen((char*)buf));
 //WAIT FOR PEER
 while(1){
@@ -480,7 +480,7 @@ tv.tv_sec=60;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
 FD_SET(STDIN_FILENO,&readfds);
-if(FD_ISSET(STDIN_FILENO,&readfds))if(read(STDIN_FILENO,buf,1)==1)if(buf[0]=='#')if(read(STDIN_FILENO,buf+1,3)==3){
+if(FD_ISSET(STDIN_FILENO,&readfds))if(read(STDIN_FILENO,&buf,1)==1)if(buf[0]=='#')if(read(STDIN_FILENO,&buf+1,3)==3){
 if(!bcmp(&buf,"#NO#",4)){close(ffd);printf("BSEND %s REFUSED BY PEER\r\r",name);return(-1);};
 if(!bcmp(&buf,"#OK#",4))break;
 };//HANDLE OK OR NOT OK
@@ -488,9 +488,9 @@ if(!bcmp(&buf,"#OK#",4))break;
 //PEER HAS TO ACCEPT WITHIN 1 MINUTE
 if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);write(STDOUT_FILENO,"\r#ABORT#\r",9);printf("BSEND: %s TIMED OUT\r\r",name);return(-1);};
 //MOVE TOTAL BYTES TO TRANSFER INTO SUBSTRACTION REGISTER
-rtotal=statbuf.st_size;
+remain=statbuf.st_size;
 //WHILE BYTES TO SEND LEFT, SEND BLOCKS OF DATA
-while((rbytes>0)&&(rtotal>0)){
+while((rbytes>0)&&(remain>0)){
 tv.tv_sec=10;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
@@ -502,19 +502,18 @@ select(nfds+1,&readfds,NULL,NULL,&tv);
 if(FD_ISSET(STDIN_FILENO,&readfds))while(read(STDIN_FILENO,&buf,1)==1)if(buf[0]=='#')if(read(STDIN_FILENO,&buf+1,6)==6)if(!bcmp(&buf,"#ABORT#",7)){close(ffd);printf("BSEND: %s ABORTED BY PEER\r\r",name);return(-1);};
 //SEND DATA
 if(FD_ISSET(ffd,&readfds)){
-rbytes=read(ffd,buf,sizeof(buf));
+rbytes=read(ffd,&buf,sizeof(buf));
 if(rbytes<1){close(ffd);write(STDOUT_FILENO,"\r#ABORT#\r",9);printf("BSEND ABORTED: %s FILE READ ERROR\r\r",name);return(-1);};
-rtotal-=rbytes;
+remain-=rbytes;
 wbytes=write(STDOUT_FILENO,&buf,rbytes);
-if(wbytes<1){close(ffd);write(STDOUT_FILENO,"\r#ABORT#\r",9);printf("BSEND ABORTED: %s DATA TRANSMIT ERROR\r\r",name);return(-1);};
+if(wbytes<rbytes){close(ffd);write(STDOUT_FILENO,"\r#ABORT#\r",9);printf("BSEND ABORTED: %s DATA TRANSMIT ERROR\r\r",name);return(-1);};
 };//FDISSET FILE
 };//WHILE DATA LEFT TO SEND
 close(ffd);
 //STDIN BACK TO BLOCKING MODE TO BE SURE
 if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK)){printf("SYSTEM ERROR\r");};
 printf("\rBINSEND FILE: %s BYTES: %ld\r\r",name,statbuf.st_size);
-};//IF FILENAME
-};//IF PARAMETERS
+return(statbuf.st_size);
 };//CMDBSEND
 
 void cmdread(char*name){
