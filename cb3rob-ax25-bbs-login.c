@@ -480,13 +480,15 @@ sprintf((char*)&buf,"#BIN#%lu\r",statbuf.st_size);
 write(STDOUT_FILENO,&buf,strlen((char*)buf));
 //WAIT FOR PEER
 while(1){
+sync();
 tv.tv_sec=60;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
 FD_SET(STDIN_FILENO,&readfds);
 select(STDIN_FILENO+1,&readfds,NULL,NULL,&tv);
-if(FD_ISSET(STDIN_FILENO,&readfds))if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
-for(n=0;(n<(sizeof(buf)-5))&&(buf[n]!='#');n++);//SET N TO OFFSET OF FIRST #
+if(FD_ISSET(STDIN_FILENO,&readfds))
+//'STATION A SHOULD IGNORE ANY DATA NOT BEGINNING WITH #OK# OR #NO#' - AS WE ARE RUNNING ON A PTY WE CAN'T BE ABSOLUTELY SURE OF AX.25 FRAME LIMITS THOUGH.
+while(read(STDIN_FILENO,&buf,1)>0)if(buf[0]=='#')if(read(STDIN_FILENO,&buf+1,6)>0){
 if(!bcmp(&buf+n,"#NO#",4)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
 //GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
 if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
