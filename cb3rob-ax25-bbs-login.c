@@ -496,7 +496,7 @@ if(!bcmp(&buf+n,"#OK#",4))break;
 };//HANDLE OK OR NOT OK
 };//WAIT FOR #OK# OR #NO#
 //PEER HAS TO ACCEPT WITHIN 1 MINUTE - ALSO AT LEAST TRY TO FORCE THE PTY TO SEND THE ABORT IN IT'S VERY OWN PACKET AS PER DOCUMENTATION...
-if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);sync();write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();printf("BGET: %s TIMED OUT\r\r",name);return(-1);};
+if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BGET: %s TIMED OUT\r\r",name);return(-1);};
 //MOVE TOTAL BYTES TO TRANSFER INTO SUBSTRACTION REGISTER
 remain=statbuf.st_size;
 //WHILE BYTES TO SEND LEFT, SEND BLOCKS OF DATA
@@ -542,9 +542,11 @@ if(name[0])printf("\rREAD: %ld BYTES\r\r",readfile(name,BPNLCR));else printf("ER
 };//CMDCHDIR
 
 void cmdautobin(char*bincmd,char*username){
-printf("\r#ABORT#\r");
 sync();
-sleep(2);
+sleep(1);
+printf("#NO#\r");
+sync();
+sleep(1);
 printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");
 };//CMDAUTOBIN
 
