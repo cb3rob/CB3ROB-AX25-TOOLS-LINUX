@@ -490,7 +490,7 @@ if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);write(STDOUT_FILENO,"\r#ABORT#\r"
 //MOVE TOTAL BYTES TO TRANSFER INTO SUBSTRACTION REGISTER
 remain=statbuf.st_size;
 //WHILE BYTES TO SEND LEFT, SEND BLOCKS OF DATA
-while((rbytes>0)&&(remain>0)){
+while(remain>0){
 tv.tv_sec=10;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
