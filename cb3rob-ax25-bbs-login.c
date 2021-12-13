@@ -480,9 +480,11 @@ tv.tv_sec=60;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
 FD_SET(STDIN_FILENO,&readfds);
-if(FD_ISSET(STDIN_FILENO,&readfds))if(read(STDIN_FILENO,&buf,1)==1)if(buf[0]=='#')if(read(STDIN_FILENO,&buf+1,3)==3){
-if(!bcmp(&buf,"#NO#",4)){close(ffd);printf("BSEND %s REFUSED BY PEER\r\r",name);return(-1);};
-if(!bcmp(&buf,"#OK#",4))break;
+select(STDIN_FILENO+1,&readfds,NULL,NULL,&tv);
+if(FD_ISSET(STDIN_FILENO,&readfds))if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
+for(n=0;(n<(sizeof(buf)-5))&&(buf[n]!='#');n++);//SET N TO OFFSET OF FIRST #
+if(!bcmp(&buf+n,"#NO#",4)){close(ffd);printf("BSEND %s REFUSED BY PEER\r\r",name);return(-1);};
+if(!bcmp(&buf+n,"#OK#",4))break;
 };//HANDLE OK OR NOT OK
 };//WAIT FOR #OK# OR #NO#
 //PEER HAS TO ACCEPT WITHIN 1 MINUTE
