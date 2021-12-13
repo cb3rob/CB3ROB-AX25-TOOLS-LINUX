@@ -519,8 +519,9 @@ if(!bcmp(currentcmd,"RMDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmd
 if(!bcmp(currentcmd,"RM",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmderase((char*)currentcmd+2);continue;};
 //READ ASCII
 if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};
-//DISCONNECT
+//TRANSFER TEST
 if(!strcmp(currentcmd,"TEST")){cmdtest(user);continue;};
+//DISCONNECT
 if(!strcmp(currentcmd,"BYE")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"EXIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"QUIT")){cmdbye(user);continue;};
