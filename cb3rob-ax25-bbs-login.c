@@ -604,7 +604,7 @@ if(!bcmp(currentcmd,"RM",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdera
 //READ ASCII
 if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};
 //READ BIN
-if(!bcmp(currentcmd,"BGET",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdbget((char*)currentcmd+5);continue;};
+if(!bcmp(currentcmd,"BGET",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdbget((char*)currentcmd+4);continue;};
 //TRANSFER TEST
 if(!strcmp(currentcmd,"TEST")){cmdtest(user);continue;};
 //DISCONNECT
