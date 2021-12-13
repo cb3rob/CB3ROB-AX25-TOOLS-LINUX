@@ -168,7 +168,7 @@ if((n==0)&&((cmd[n]==0x20)||(cmd[n]=='\r'))){cmd[n]=0;n--;continue;};//NO SPACES
 if(cmd[n]=='\r'){cmd[n]=0;break;};//DONE
 if((cmd[n]<0x20)||cmd[n]>0x7E){cmd[n]=0;n--;continue;};//NO WEIRD BINARY STUFF
 };//FOR
-printf("\rCOMMAND: %s\r",cmd);//PRINT IT IN CASE USER HAS ECHO OFF IN HIS TERMINAL
+printf("\rCOMMAND: %s\r\r",cmd);//PRINT IT IN CASE USER HAS ECHO OFF IN HIS TERMINAL
 return((char*)&cmd);
 };//GETCOMMAND
 
@@ -334,14 +334,14 @@ return(0);
 };//INITUSER;
 
 int cmdbye(char*username){
-printf("SEE YOU AGAIN SOON %s\r",username);
+printf("SEE YOU AGAIN SOON %s\r\r",username);
 sync();
 sleep(10);
 exit(EXIT_SUCCESS);
 };//CMDBYE
 
 void cmdinvalid(){
-printf("INVALID COMMAND - TRY HELP\r");
+printf("INVALID COMMAND - TRY HELP\r\r");
 };//CMDINVALID
 
 void cmdhelp(){
@@ -351,12 +351,12 @@ printf("MD   <PATH>  - CREATES DIRECTORY\r");
 printf("RM   <PATH>  - REMOVES FILE OR EMPTY DIRECTORY\r");
 printf("READ <PATH>  - READS TEXT FILE\r");
 printf("EXIT         - TERMINATES SESSION\r");
-printf("\rPATHNAMES ARE 8.3 FORMAT [ A-Z 0-9 ]\r");
+printf("\rPATHNAMES ARE 8.3 FORMAT [ A-Z 0-9 ]\r\r");
 //printf("AUTOBIN UPLOADS CAN BE STARTED WHILE ON THE PROMPT\r");
 //prrint("UPLOADS TO YOUR HOMEDIR OR /FILES OR /ANARCHY ONLY\r");
 };//CMDHELP
 
-int cmddir(char*dirname){
+int cmddir(char*name){
 DIR*curdir;
 struct dirent*direntry;
 struct stat filestat;
@@ -364,16 +364,16 @@ size_t total;
 size_t files;
 size_t dirs;
 int n;
-if(dirname==NULL)dirname=getcwd(NULL,0);
-for(n=0;dirname[n]==0x20;n++);
-dirname=dirname+n;//STRIP LEADING SPACE
-if(!dirname[0])dirname=getcwd(NULL,0);
+if(name==NULL)name=getcwd(NULL,0);
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(!name[0])name=getcwd(NULL,0);
 total=0;
 files=0;
 dirs=0;
-curdir=opendir(dirname);
-if(curdir==NULL){printf("ERROR OPENING DIRECTORY: %s\r",dirname);return(-1);};//ERROR
-printf("\rDIRECTORY OF %s\r\r",dirname);
+curdir=opendir(name);
+if(curdir==NULL){printf("ERROR OPENING DIRECTORY: %s\r\r",name);return(-1);};//ERROR
+printf("DIRECTORY OF %s\r\r",name);
 printf("./\r");
 printf("../\r");
 while((direntry=readdir(curdir))!=NULL){
@@ -394,42 +394,42 @@ continue;
 };//SWITCH ENTRY TYPE
 };//VALID FILENAME
 };//WHILE DIRENTRY
+if(closedir(curdir)==-1)printf("ERROR CLOSING DIRECTORY\r");//ERROR;
 printf("\rTOTAL: %lu BYTES IN: %lu FILES AND %lu DIRECTORIES\r\r",total,files,dirs);
-if(closedir(curdir)==-1){printf("ERROR CLOSING DIRECTORY\r");return(-1);};//ERROR;
 return(0);
 };//CMDDIR
 
-void cmdchdir(char*dir){
+void cmdchdir(char*name){
 int n;
-if(dir!=NULL){
-for(n=0;dir[n]==0x20;n++);
-dir=dir+n;//STRIP LEADING SPACE
-if(dir[0]){//JUST SHOW PWD
-if(chdir(dir))printf("CHDIR TO %s FAILED\r",dir);
+if(name!=NULL){
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(name[0]){//JUST SHOW PWD
+if(chdir(name))printf("CHDIR TO %s FAILED\r",name);
 };//IF PARAMETERS OTHER THAN SPACE
 };//IF PARAMETERS
 printf("CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
 };//CMDCHDIR
 
-void cmdmkdir(char*dir){
+void cmdmkdir(char*name){
 int n;
-if(dir!=NULL){
-for(n=0;dir[n]==0x20;n++);
-dir=dir+n;//STRIP LEADING SPACE
-if(chkpath(dir)==-1)printf("INVALID ABSOLUTE 8.3 FORMAT [A-Z 0-9] PATH: %s\r",dir);
-else if(mkdir(dir,00750))printf("CREATE DIRECTORY %s FAILED\r",dir);
-else chdir(dir);//WE CD INTO IT DIRECTLY
+if(name!=NULL){
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(chkpath(name)==-1)printf("INVALID ABSOLUTE 8.3 FORMAT [A-Z 0-9] PATH: %s\r",name);
+else if(mkdir(name,00750))printf("CREATE DIRECTORY %s FAILED\r",name);
+else chdir(name);//WE CD INTO IT DIRECTLY
 printf("CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
 };//IF PARAMETERS
 };//CMDMKDIR
 
-void cmderase(char*path){
+void cmderase(char*name){
 int n;
-if(path!=NULL){
-for(n=0;path[n]==0x20;n++);
-path=path+n;//STRIP LEADING SPACE
-if(chkpath(path)==-1)printf("INVALID ABSOLUTE 8.3 FORMAT [A-Z 0-9] PATH: %s\r",path);
-else if(remove(path))printf("ERASE %s FAILED\r",path);
+if(name!=NULL){
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(chkpath(name)==-1)printf("INVALID ABSOLUTE 8.3 FORMAT [A-Z 0-9] PATH: %s\r",name);
+else if(remove(name))printf("ERASE %s FAILED\r",name);
 printf("CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
 };//IF PARAMETERS
 };//CMDERASE
@@ -446,12 +446,12 @@ int n;
 for(n=0;n<100;n++)printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 };
 
-void cmdread(char*filename){
+void cmdread(char*name){
 int n;
-if(filename!=NULL){
-for(n=0;filename[n]==0x20;n++);
-filename=filename+n;//STRIP LEADING SPACE
-if(filename[0])printf("\rREAD: %ld BYTES\r\r",readfile(filename,BPNLCR));else printf("FILENAME?\r\r");
+if(name!=NULL){
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(name[0])printf("\rREAD: %ld BYTES\r\r",readfile(name,BPNLCR));else printf("ERROR OPENING: %s FILENAME?\r\r",name);
 };//IF PARAMETERS
 };//CMDCHDIR
 
@@ -459,7 +459,7 @@ void cmdautobin(char*bincmd,char*username){
 printf("\r#ABORT#\r");
 sync();
 sleep(2);
-printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r");
+printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");
 };//CMDAUTOBIN
 
 int main(int argc,char**argv){
@@ -494,7 +494,7 @@ inituser(user);
 
 printstatus();
 printwelcome();
-printf("\rREAD: %ld BYTES\r\r",readfile("/ETC/WELCOME.TXT",BPNLCR));
+readfile("/ETC/WELCOME.TXT",BPNLCR);
 while(1){//IF THE PARENT DIES WE DIE BY SIGNAL ANYWAY
 printprompt();
 currentcmd=getcommand();
@@ -502,24 +502,34 @@ if(currentcmd==NULL)break;//BLOCKING READ FELL THROUGH AS PARENT CLOSED PTY (MOS
 if(!bcmp(currentcmd,"#BIN#",5)){cmdautobin(currentcmd,user);continue;};//RELAY THE ENTIRE CMD LINE TO THE AUTOBIN PROGRAM
 for(n=0;currentcmd[n]!=0;n++)if(currentcmd[n]==0x5C)currentcmd[n]=0x2F;//FETCH STRINGLENGTH AND TRANSLATE PATHS
 if(n>0)for(n--;(n>=0)&&(currentcmd[n]==0x20);n--)currentcmd[n]=0;//REMOVE TRAILING SPACE WORKING BACKWARDS
+//DIR
+if(!bcmp(currentcmd,"DIR",3))if((currentcmd[3]==0x20)||(currentcmd[3]==0)){cmddir((char*)currentcmd+3);continue;};
+if(!bcmp(currentcmd,"LS",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmddir((char*)currentcmd+2);continue;};
+if(!bcmp(currentcmd,"LIST",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmddir((char*)currentcmd+4);continue;};
+//CHANGE DIR
 if(!bcmp(currentcmd,"CHDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdchdir((char*)currentcmd+5);continue;};
 if(!bcmp(currentcmd,"CD",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdchdir((char*)currentcmd+2);continue;};
+//MAKE DIR
 if(!bcmp(currentcmd,"MKDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdmkdir((char*)currentcmd+5);continue;};
 if(!bcmp(currentcmd,"MD",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdmkdir((char*)currentcmd+2);continue;};
+//ERASE
 if(!bcmp(currentcmd,"ERASE",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmderase((char*)currentcmd+5);continue;};
 if(!bcmp(currentcmd,"DEL",3))if((currentcmd[3]==0x20)||(currentcmd[3]==0)){cmderase((char*)currentcmd+3);continue;};
 if(!bcmp(currentcmd,"RMDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmderase((char*)currentcmd+5);continue;};
 if(!bcmp(currentcmd,"RM",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmderase((char*)currentcmd+2);continue;};
+//READ ASCII
 if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};
+//DISCONNECT
 if(!strcmp(currentcmd,"TEST")){cmdtest(user);continue;};
 if(!strcmp(currentcmd,"BYE")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"EXIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"QUIT")){cmdbye(user);continue;};
 if(!strcmp(currentcmd,"SALIR")){cmdbye(user);continue;};
 if(!bcmp(currentcmd,"DISC",4)){cmdbye(user);continue;};//DISCONNECT IS GOOD WITH ANY ABBREVIATION
+//HELP
 if(!strcmp(currentcmd,"HELP")){cmdhelp();continue;};
-if(!bcmp(currentcmd,"DIR",3))if((currentcmd[3]==0x20)||(currentcmd[3]==0)){cmddir((char*)currentcmd+3);continue;};
 //if(!strcmp(currentcmd,"GODMODE")){cmdshell();continue;};
+//FALLTHROUGH INVALID
 cmdinvalid();
 };//COMMAND LOOP
 exit(EXIT_SUCCESS);
