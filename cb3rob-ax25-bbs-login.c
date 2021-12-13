@@ -444,7 +444,63 @@ printf("CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
 void cmdtest(){
 int n;
 for(n=0;n<100;n++)printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+};//CMDTEST
+
+ssize_t cmdbinsend(char*name){
+int n;
+int ffd;
+ssize_t rbytes;
+ssize_t wbytes;
+ssize_t rtotal;
+struct stat statbuf;
+uint8_t buf[128];
+if(name!=NULL){
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(name[0]){
+//MAKE SURE STDIN IS IN NON BLOCKING MODE
+if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)|O_NONBLOCK)){printf("SYSTEM ERROR\r\r");return(-1);};
+while(read(STDIN_FILENO,&buf,sizeof(buf))>0);//FLUSH STDIN TO MAKE SURE PEERS #OK# IS AT THE START OF RECEPTION
+//OPEN FILE
+ffd=open(name,O_RDONLY,O_NONBLOCK|O_SYNC);
+if(ffd==-1){printf("ERROR OPENING: %s\r\r",name);return(-1);};
+//FILE IS NOW OPEN
+if(fstat(ffd,&statbuf)==-1){close(ffd);printf("SYSTEM ERROR\r\r");return(-1);};
+if((!(statbuf.st_mode&S_IFMT&S_IFREG))||(statbuf.st_size==0)){close(ffd);printf("ERROR OPENING: %s\r\r",name);return(-1);};
+//STDIN BACK TO BLOCKING MODE
+if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK)){close(ffd),printf("SYSTEM ERROR\r\r");return(-1);};
+printf("#BIN#%lu\r",statbuf.st_size);
+while(read(STDIN_FILENO,buf,1)==1)if(buf[0]=='#')if(read(STDIN_FILENO,buf+1,3)==3){
+if(!bcmp(&buf,"#OK#",4))break;
+if(!bcmp(&buf,"#NO#",4)){close(ffd);printf("CANCELLED: %s\r\r",name);return(-1);};
+if(!bcmp(&buf,"#ABORT#",7)){close(ffd);printf("CANCELLED: %s\r\r",name);return(-1);};
+//ELSE KEEP TRYING UNTIL ANSWER IS EITHER #OK# OR #NO#
 };
+
+if(bcmp(&buf,"#OK#",4)){close(ffd);printf("\r#ABORT#\r");printf("READ ERROR\r\r");return(-1);};
+
+
+if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)|O_NONBLOCK)){printf("SYSTEM ERROR\r\r");return(-1);};
+rtotal=statbuf.st_size;
+
+while((rbytes>0)&&(rtotal>0)){
+rbytes=read(ffd,buf,sizeof(buf));
+if(rbytes<1){close(ffd);printf("\r#ABORT#\r");printf("READ ERROR\r\r");return(-1);};
+rtotal-=rbytes;
+wbytes=write(STDOUT_FILENO,buf,rbytes);
+if(wbytes<1){close(ffd);printf("\r#ABORT#\r");printf("SEND ERROR\r\r");return(-1);};
+while(read(STDIN_FILENO,&buf,sizeof(buf))>0);//FLUSH STDIN TO MAKE SURE PEERS #OK# IS AT THE START OF RECEPTION
+//GET RESPONSE
+//NONBLOCK MODE!
+//rbytes=read(STDIN_FILENO,buf,sizeof(buf);
+};//WHILE READ FILE
+close(ffd);
+//printf("#OK#\r");
+if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK)){printf("SYSTEM ERROR\r");};
+printf("\rBINSEND FILE: %s BYTES: %ld\r\r",name,statbuf.st_size);
+};//IF FILENAME
+};//IF PARAMETERS
+};//CMDBINSEND
 
 void cmdread(char*name){
 int n;
@@ -519,6 +575,8 @@ if(!bcmp(currentcmd,"RMDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmd
 if(!bcmp(currentcmd,"RM",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmderase((char*)currentcmd+2);continue;};
 //READ ASCII
 if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};
+//READ BIN
+if(!bcmp(currentcmd,"BSEND",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdbinsend((char*)currentcmd+5);continue;};
 //TRANSFER TEST
 if(!strcmp(currentcmd,"TEST")){cmdtest(user);continue;};
 //DISCONNECT
