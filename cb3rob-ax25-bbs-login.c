@@ -105,7 +105,7 @@ ssize_t wbytes;
 ssize_t total;
 int n;
 if(filename==NULL)return(-1);
-ffd=open(filename,O_RDONLY,O_NONBLOCK|O_SYNC);
+ffd=open(filename,O_RDONLY,0);
 if(ffd==-1)return(-1);
 total=0;
 wbytes=0;
@@ -466,11 +466,12 @@ if(name==NULL)return(-1);
 for(n=0;name[n]==0x20;n++);
 name=name+n;//STRIP LEADING SPACE
 if(!name[0])return(-1);
-//MAKE SURE STDIN IS IN NON BLOCKING MODE
+//FLUSH STDIN
 if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)|O_NONBLOCK)){printf("SYSTEM ERROR\r\r");return(-1);};
 while(read(STDIN_FILENO,&buf,sizeof(buf))>0);//FLUSH STDIN TO MAKE SURE PEERS #OK# IS AT THE START OF RECEPTION
+if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK)){printf("SYSTEM ERROR\r\r");return(-1);};
 //OPEN FILE
-ffd=open(name,O_RDONLY,O_NONBLOCK|O_SYNC);
+ffd=open(name,O_RDONLY,0);
 if(ffd==-1){printf("ERROR OPENING: %s\r\r",name);return(-1);};
 //FILE IS NOW OPEN
 if(fstat(ffd,&statbuf)==-1){close(ffd);printf("SYSTEM ERROR\r\r");return(-1);};
@@ -478,6 +479,7 @@ if((!(statbuf.st_mode&S_IFMT&S_IFREG))||(statbuf.st_size==0)){close(ffd);printf(
 //START OUR SIDE
 sprintf((char*)&buf,"#BIN#%lu\r",statbuf.st_size);
 write(STDOUT_FILENO,&buf,strlen((char*)buf));
+
 //WAIT FOR PEER
 while(1){
 sync();
@@ -485,8 +487,7 @@ tv.tv_sec=60;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
 FD_SET(STDIN_FILENO,&readfds);
-select(STDIN_FILENO+1,&readfds,NULL,NULL,&tv);
-if(FD_ISSET(STDIN_FILENO,&readfds))
+if(select(STDIN_FILENO+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(STDIN_FILENO,&readfds)){
 //'STATION A SHOULD IGNORE ANY DATA NOT BEGINNING WITH #OK# OR #NO#' - AS WE ARE RUNNING ON A PTY WE CAN'T BE ABSOLUTELY SURE OF AX.25 FRAME LIMITS THOUGH.
 memset(&buf,0,sizeof(buf));
 if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
@@ -496,46 +497,54 @@ if(!bcmp(buf+n,"#NO#",4)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);
 if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
 if(!bcmp(buf+n,"#OK#",4))break;
 };//HANDLE OK OR NOT OK
+};//SELECT READ
 };//WHILE FETCH DATA
+
 //PEER HAS TO ACCEPT WITHIN 1 MINUTE - ALSO AT LEAST TRY TO FORCE THE PTY TO SEND THE ABORT IN IT'S VERY OWN PACKET AS PER DOCUMENTATION...
 if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BGET: %s TIMED OUT\r\r",name);return(-1);};
 //MOVE TOTAL BYTES TO TRANSFER INTO SUBSTRACTION REGISTER
 remain=statbuf.st_size;
 //WHILE BYTES TO SEND LEFT, SEND BLOCKS OF DATA
 while(remain>0){
+
+FD_ZERO(&readfds);
+FD_SET(ffd,&readfds);
+FD_SET(STDIN_FILENO,&readfds);
 tv.tv_sec=10;
 tv.tv_usec=0;
-FD_ZERO(&readfds);
-FD_ZERO(&writefds);
-FD_SET(STDIN_FILENO,&readfds);
-FD_SET(STDOUT_FILENO,&writefds);
-FD_SET(ffd,&readfds);
 nfds=STDIN_FILENO;
 if(STDOUT_FILENO>nfds)nfds=STDOUT_FILENO;
 if(ffd>nfds)nfds=ffd;
-select(nfds+1,&readfds,&writefds,NULL,&tv);
+if(select(nfds+1,&readfds,NULL,NULL,&tv)>0){
 //HANDLE ABORT -BEFORE SENDING DATA-, IGNORE ANYTHING ELSE THAT COMES IN, AS PER SPECIFICATION
+
 if(FD_ISSET(STDIN_FILENO,&readfds)){
 memset(&buf,0,sizeof(buf));
 if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
 for(n=0;(n<sizeof(buf)-7)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST # (ABORT IS SUPPOSED TO BE BETWEEN 2 \r's IN A PACKET OF IT'S OWN BUT WE'RE LESS PICKY)
 if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);printf("BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
-};//IF DATA
+};//IF READ
 };//FD_ISSET PTY
+
 //SEND DATA - AND YES WE MUST CHECK IF THE PTY IS READY TO TAKE IT OR THINGS GO REALLY BONKERS
-if(FD_ISSET(ffd,&readfds)&&FD_ISSET(STDOUT_FILENO,&writefds)){
+//WRITE BYTES
+if(FD_ISSET(ffd,&readfds)){
+FD_ZERO(&writefds);
+FD_SET(STDOUT_FILENO,&writefds);
+tv.tv_sec=0;
+tv.tv_usec=100000;
+if(select(STDOUT_FILENO+1,NULL,&writefds,NULL,&tv)>0)if(FD_ISSET(STDOUT_FILENO,&writefds)){
 rbytes=read(ffd,&buf,sizeof(buf));
 if(rbytes<1){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BGET ABORTED: %s FILE READ ERROR\r\r",name);return(-1);};
 remain-=rbytes;
 wbytes=write(STDOUT_FILENO,&buf,rbytes);
 if(wbytes<rbytes){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BGET ABORTED: %s DATA TRANSMIT ERROR\r\r",name);return(-1);};
-};//FDISSET FILE
-//BANGING THE CPU A BIT HERE IF THE PTY IS -NOT- READY TO ACCEPT MORE DATA (STDOUT -> PTY (BUFFER) -> MASTER -> SENDCLIENT() (BUFFER TO SLOW NETWORK) -> USUALLY SLLOOWWW CLIENT ALSO TRYING TO CRC IT)
-if(!FD_ISSET(STDOUT_FILENO,&writefds))sleep(1);//HAVE CPU DO OTHER THINGS. THIS WHOLE THING IS SINGLE TASKING ANYWAY.
+};//FDISSET WRITE
+};//FDISSET FDD READ
+
+};//SELECT READ FILEDESCRIPTORS
 };//WHILE DATA LEFT TO SEND
 close(ffd);
-//STDIN BACK TO BLOCKING MODE TO BE SURE
-if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK)){printf("SYSTEM ERROR\r");};
 printf("\rBGET FILE: %s BYTES: %ld\r\r",name,statbuf.st_size);
 return(statbuf.st_size);
 };//CMDBGET
@@ -561,13 +570,13 @@ ssize_t remain;
 ssize_t okreturn;
 struct stat statbuf;
 uint8_t buf[256];
-uint8_t name[256];
-uint16_t crc;
+char name[256];
+//uint16_t crc;
 int parsefield;
 memset(&name,0,sizeof(name));
 parsefield=0;
+okreturn=0;
 if((bincmd==NULL)||(username==NULL))return(-1);
-//sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);//DENY UPLOAD
 for(n=0;(bincmd[n]!=0)&&(bincmd[n]!='\r');n++){
 if(bincmd[n]=='#'){
 n++;//SKIP FIELD DELIMITER ITSELF
@@ -576,7 +585,6 @@ memset(&buf,0,sizeof(buf));
 for(f=0;((n+f)<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd[n+f]!='#');f++)buf[f]=bincmd[n+f];
 //printf("FIELD: %d: [%s]\r",parsefield,buf);
 if(parsefield==0)if(strcmp((char*)buf,"BIN")){sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
-
 if(parsefield==1){//FILE LENGTH
 for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<0x30)||(buf[c]>0x39)){sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);return(-1);};//NOT A DECIMAL NUMBER
 remain=atoll((char*)buf);
@@ -602,10 +610,8 @@ n--;//PUT N BACK WHERE WE FOUND IT SO WE DON'T SKIP SEGMENTS
 parsefield++;
 };//FOR FIELDCOPY
 };//FOR BYTE
-
 //GENERATE RANDOM FILENAME IF NOT PRESENT OR INVALID
 memset(&buf,0,sizeof(buf));
-
 if(name[0]==0){
 for(n=0;n<8;n++)buf[n]=(rand()&0x0F)+0x41;
 buf[n++]=0x2D;
@@ -617,23 +623,16 @@ snprintf(name,sizeof(name)-1,"%s-%s",username,buf+o);
 //printf("FILENAME OUT: %s\r",name);
 //printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");return(-1);
 };//FILENAME ZERO RANDOMIZER
-
-//MAKE SURE STDIN IS IN NON BLOCKING MODE
-if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)|O_NONBLOCK)){printf("SYSTEM ERROR\r\r");return(-1);};
-
-ffd=open(name,O_WRONLY|O_CREAT|O_EXCL|O_NONBLOCK,00640);
+ffd=open(name,O_WRONLY|O_CREAT|O_EXCL,00640);
 if(ffd==-1){sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);printf("BPUT ABORTED: %s FILE CREATION ERROR - NO PERMISSION HERE OR FILE EXITS\r\r",name);return(-1);};
-
 //GIVE OK FOR TRANSFER
 sync();sleep(1);write(STDOUT_FILENO,"#OK#\r",5);sync();
-
 while(remain>0){
 tv.tv_sec=10;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
-FD_SET(STDIN_FILENO,&readfds);//ONLY INTERESTED IN STDIN. IF WRITE FAILS THE DISK IS PROBABLY BROKEN OR FULL
-select(STDIN_FILENO+1,&readfds,NULL,NULL,&tv);
-if(FD_ISSET(STDIN_FILENO,&readfds)){
+FD_SET(STDIN_FILENO,&readfds);
+if(select(STDIN_FILENO+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(STDIN_FILENO,&readfds)){
 memset(&buf,0,sizeof(buf));
 rbytes=read(STDIN_FILENO,&buf,sizeof(buf));
 if(rbytes<1){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BPUT ABORTED: %s DATA RECEIVE ERROR\r\r",name);return(-1);};
@@ -647,8 +646,6 @@ remain-=wbytes;
 };//FDISSET FILE
 };//WHILE DATA LEFT TO SEND
 close(ffd);
-//STDIN BACK TO BLOCKING MODE TO BE SURE
-if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK)){printf("SYSTEM ERROR\r");};
 printf("\rBPUT FILE: %s BYTES: %ld\r\r",name,okreturn);
 return(okreturn);
 };//CMDBPUT
@@ -675,6 +672,8 @@ for(n=0;(n<sizeof(user)-1)&&(call[n])&&(call[n]!='-');n++)user[n]=call[n];
 //WE'LL SIMPLY HAVE TO PRINTF() THE ENTIRE PACKET PAYLOAD IN ONE GO AS MUCH AS POSSIBLE, RESULTING IN ONE WRITE()
 //LINUX REFUSES TO SEE CARRIAGE RETURN AS A DELIMITER OF ANY KIND
 setbuf(stdout,NULL);
+if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK))printf("SYSTEM ERROR\r\r");
+if(fcntl(STDOUT_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK))printf("SYSTEM ERROR\r\r");
 
 //INITIALIZE TERMIOS
 terminit();
