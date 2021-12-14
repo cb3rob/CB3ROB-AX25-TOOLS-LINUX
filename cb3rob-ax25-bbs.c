@@ -637,8 +637,8 @@ if(select(nfds+1,&readfds,NULL,NULL,&tv)>0){
 if(FD_ISSET(csock,&readfds)){
 memset(&buf,0,sizeof(buf));
 if(read(csock,&buf,sizeof(buf))>0){
-for(n=0;(n<sizeof(buf)-7)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST # (ABORT IS SUPPOSED TO BE BETWEEN 2 \r's IN A PACKET OF IT'S OWN BUT WE'RE LESS PICKY)
-if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
+if(!bcmp(buf+n,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
+if(!bcmp(buf+n,"#ABORT#\r",8)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
 };//IF READ
 };//FD_ISSET PTY
 
@@ -745,6 +745,7 @@ memset(&buf,0,sizeof(buf));
 rbytes=read(csock,&buf,sizeof(buf));
 if(rbytes<1){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BPUT ABORTED: %s DATA RECEIVE ERROR\r\r",name);return(-1);};
 if(!bcmp(buf,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r\r",name);return(-1);};
+if(!bcmp(buf,"#ABORT#\r",8)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r\r",name);return(-1);};
 if(bcmp(buf,"SP\\-",4)){
 wbytes=write(ffd,&buf,rbytes);
 if(wbytes<rbytes){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BPUT ABORTED: %s FILE WRITE ERROR\r\r",name);return(-1);};
