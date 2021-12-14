@@ -584,7 +584,7 @@ name=name+n;//STRIP LEADING SPACE
 if(!name[0])return(-1);
 //FLUSH STDIN
 if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK)){dprintf(csock,"SYSTEM ERROR\r\r");return(-1);};
-while(recv(csock,&buf,sizeof(buf))>0,0);//FLUSH STDIN TO MAKE SURE PEERS #OK# IS AT THE START OF RECEPTION
+while(recv(csock,&buf,sizeof(buf),0)>0);//FLUSH STDIN TO MAKE SURE PEERS #OK# IS AT THE START OF RECEPTION
 if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)&~O_NONBLOCK)){dprintf(csock,"SYSTEM ERROR\r\r");return(-1);};
 //OPEN FILE
 ffd=open(name,O_RDONLY,0);
@@ -606,7 +606,7 @@ FD_SET(csock,&readfds);
 if(select(csock+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(csock,&readfds)){
 //'STATION A SHOULD IGNORE ANY DATA NOT BEGINNING WITH #OK# OR #NO#' - AS WE ARE RUNNING ON A PTY WE CAN'T BE ABSOLUTELY SURE OF AX.25 FRAME LIMITS THOUGH.
 memset(&buf,0,sizeof(buf));
-if(recv(csock,&buf,sizeof(buf))>0,0){
+if(recv(csock,&buf,sizeof(buf),0)>0){
 for(n=0;(n<sizeof(buf)-8)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST #, ALLOW -SOME- PLAYROOM FOR EVENTUAL '\r' AT THE START (ABORT DURING SETUP) AND OTHER CREATIVE INTERPRETATIONS
 if(!bcmp(buf+n,"#NO#",4)){close(ffd);dprintf(csock,"BGET %s REFUSED BY PEER\r\r",name);return(-1);};
 //GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
@@ -636,7 +636,7 @@ if(select(nfds+1,&readfds,NULL,NULL,&tv)>0){
 
 if(FD_ISSET(csock,&readfds)){
 memset(&buf,0,sizeof(buf));
-if(recv(csock,&buf,sizeof(buf))>0,0){
+if(recv(csock,&buf,sizeof(buf),0)>0){
 if(!bcmp(buf+n,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
 if(!bcmp(buf+n,"#ABORT#\r",8)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
 };//IF READ
