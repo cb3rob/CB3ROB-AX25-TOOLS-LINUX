@@ -266,7 +266,7 @@ wbytes=0;
 rbytes=0;
 while((rbytes=read(ffd,&buf,sizeof(buf)))>1){
 if(asciimode&BPNLCR)for(n=0;n<rbytes;n++)if(buf[n]=='\n')buf[n]='\r';
-if((wbytes=write(csock,&buf,rbytes))<1)break;
+if((wbytes=send(csock,&buf,rbytes))<1,0)break;
 total+=wbytes;
 };//WHILE READBLOCK
 close(ffd);
@@ -292,7 +292,7 @@ char*getcommand(){
 static unsigned char cmd[128];
 int n;
 memset(&cmd,0,sizeof(cmd));
-if(read(csock,(void*)&cmd,sizeof(cmd)-1)<1)return(NULL);
+if(recv(csock,(void*)&cmd,sizeof(cmd)-1)<1)return(NULL,0);
 for(n=0;(n<sizeof(cmd))&&(cmd[n]);n++){
 if((cmd[n]=='\r')||(cmd[n]=='\n')){cmd[n]=0;break;};
 if(cmd[n]==0x09){cmd[n]=0x20;continue;};//HTAB TO SPACE
@@ -584,7 +584,7 @@ name=name+n;//STRIP LEADING SPACE
 if(!name[0])return(-1);
 //FLUSH STDIN
 if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK)){dprintf(csock,"SYSTEM ERROR\r\r");return(-1);};
-while(read(csock,&buf,sizeof(buf))>0);//FLUSH STDIN TO MAKE SURE PEERS #OK# IS AT THE START OF RECEPTION
+while(recv(csock,&buf,sizeof(buf))>0,0);//FLUSH STDIN TO MAKE SURE PEERS #OK# IS AT THE START OF RECEPTION
 if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)&~O_NONBLOCK)){dprintf(csock,"SYSTEM ERROR\r\r");return(-1);};
 //OPEN FILE
 ffd=open(name,O_RDONLY,0);
@@ -594,7 +594,7 @@ if(fstat(ffd,&statbuf)==-1){close(ffd);dprintf(csock,"SYSTEM ERROR\r\r");return(
 if((!(statbuf.st_mode&S_IFMT&S_IFREG))||(statbuf.st_size==0)){close(ffd);dprintf(csock,"ERROR OPENING: %s\r\r",name);return(-1);};
 //START OUR SIDE
 sprintf((char*)&buf,"#BIN#%lu\r",statbuf.st_size);
-write(csock,&buf,strlen((char*)buf));
+send(csock,&buf,strlen((char*)buf),0);
 
 //WAIT FOR PEER
 while(1){
@@ -606,7 +606,7 @@ FD_SET(csock,&readfds);
 if(select(csock+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(csock,&readfds)){
 //'STATION A SHOULD IGNORE ANY DATA NOT BEGINNING WITH #OK# OR #NO#' - AS WE ARE RUNNING ON A PTY WE CAN'T BE ABSOLUTELY SURE OF AX.25 FRAME LIMITS THOUGH.
 memset(&buf,0,sizeof(buf));
-if(read(csock,&buf,sizeof(buf))>0){
+if(recv(csock,&buf,sizeof(buf))>0,0){
 for(n=0;(n<sizeof(buf)-8)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST #, ALLOW -SOME- PLAYROOM FOR EVENTUAL '\r' AT THE START (ABORT DURING SETUP) AND OTHER CREATIVE INTERPRETATIONS
 if(!bcmp(buf+n,"#NO#",4)){close(ffd);dprintf(csock,"BGET %s REFUSED BY PEER\r\r",name);return(-1);};
 //GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
@@ -617,7 +617,7 @@ if(!bcmp(buf+n,"#OK#",4))break;
 };//WHILE FETCH DATA
 
 //PEER HAS TO ACCEPT WITHIN 1 MINUTE - ALSO AT LEAST TRY TO FORCE THE PTY TO SEND THE ABORT IN IT'S VERY OWN PACKET AS PER DOCUMENTATION...
-if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BGET: %s TIMED OUT\r\r",name);return(-1);};
+if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BGET: %s TIMED OUT\r\r",name);return(-1);};
 //MOVE TOTAL BYTES TO TRANSFER INTO SUBSTRACTION REGISTER
 remain=statbuf.st_size;
 //WHILE BYTES TO SEND LEFT, SEND BLOCKS OF DATA
@@ -636,7 +636,7 @@ if(select(nfds+1,&readfds,NULL,NULL,&tv)>0){
 
 if(FD_ISSET(csock,&readfds)){
 memset(&buf,0,sizeof(buf));
-if(read(csock,&buf,sizeof(buf))>0){
+if(recv(csock,&buf,sizeof(buf))>0,0){
 if(!bcmp(buf+n,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
 if(!bcmp(buf+n,"#ABORT#\r",8)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
 };//IF READ
@@ -651,10 +651,10 @@ tv.tv_sec=0;
 tv.tv_usec=100000;
 if(select(csock+1,NULL,&writefds,NULL,&tv)>0)if(FD_ISSET(csock,&writefds)){
 rbytes=read(ffd,&buf,sizeof(buf));
-if(rbytes<1){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BGET ABORTED: %s FILE READ ERROR\r\r",name);return(-1);};
+if(rbytes<1){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BGET ABORTED: %s FILE READ ERROR\r\r",name);return(-1);};
 remain-=rbytes;
-wbytes=write(csock,&buf,rbytes);
-if(wbytes<rbytes){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BGET ABORTED: %s DATA TRANSMIT ERROR\r\r",name);return(-1);};
+wbytes=send(csock,&buf,rbytes,0);
+if(wbytes<rbytes){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BGET ABORTED: %s DATA TRANSMIT ERROR\r\r",name);return(-1);};
 };//FDISSET WRITE
 };//FDISSET FDD READ
 
@@ -698,12 +698,12 @@ n++;//SKIP FIELD DELIMITER ITSELF
 memset(&buf,0,sizeof(buf));
 //COPY FIELD TO BUF
 for(f=0;((n+f)<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd[n+f]!='#');f++)buf[f]=bincmd[n+f];
-if(parsefield==0)if(strcmp((char*)buf,"BIN")){write(csock,"#NO#\r",5);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
+if(parsefield==0)if(strcmp((char*)buf,"BIN")){send(csock,"#NO#\r",5,0);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
 if(parsefield==1){//FILE LENGTH
-for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<0x30)||(buf[c]>0x39)){write(csock,"#NO#\r",5);return(-1);};//NOT A DECIMAL NUMBER
+for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<0x30)||(buf[c]>0x39)){send(csock,"#NO#\r",5,0);return(-1);};//NOT A DECIMAL NUMBER
 remain=atoll((char*)buf);
 okreturn=remain;
-if(remain<1){write(csock,"#NO#\r",5);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
+if(remain<1){send(csock,"#NO#\r",5,0);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
 };//FILE LENGTH FIELD
 if(parsefield==4){
 o=0;
@@ -732,9 +732,9 @@ buf[n]=0x00;
 snprintf(name,sizeof(name)-1,"%s-%s",username,buf);
 };//FILENAME ZERO RANDOMIZER
 ffd=open(name,O_WRONLY|O_CREAT|O_EXCL,00640);
-if(ffd==-1){write(csock,"#NO#\r",5);dprintf(csock,"BPUT ABORTED: %s FILE CREATION ERROR - NO PERMISSION HERE OR FILE EXITS\r\r",name);return(-1);};
+if(ffd==-1){send(csock,"#NO#\r",5,0);dprintf(csock,"BPUT ABORTED: %s FILE CREATION ERROR - NO PERMISSION HERE OR FILE EXITS\r\r",name);return(-1);};
 //GIVE OK FOR TRANSFER
-write(csock,"#OK#\r",5);
+send(csock,"#OK#\r",5,0);
 while(remain>0){
 tv.tv_sec=10;
 tv.tv_usec=0;
@@ -742,13 +742,13 @@ FD_ZERO(&readfds);
 FD_SET(csock,&readfds);
 if(select(csock+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(csock,&readfds)){
 memset(&buf,0,sizeof(buf));
-rbytes=read(csock,&buf,sizeof(buf));
-if(rbytes<1){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BPUT ABORTED: %s DATA RECEIVE ERROR\r\r",name);return(-1);};
+rbytes=recv(csock,&buf,sizeof(buf),0);
+if(rbytes<1){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BPUT ABORTED: %s DATA RECEIVE ERROR\r\r",name);return(-1);};
 if(!bcmp(buf,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r\r",name);return(-1);};
 if(!bcmp(buf,"#ABORT#\r",8)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r\r",name);return(-1);};
 if(bcmp(buf,"SP\\-",4)){
 wbytes=write(ffd,&buf,rbytes);
-if(wbytes<rbytes){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BPUT ABORTED: %s FILE WRITE ERROR\r\r",name);return(-1);};
+if(wbytes<rbytes){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BPUT ABORTED: %s FILE WRITE ERROR\r\r",name);return(-1);};
 remain-=wbytes;
 };//IGNORE PRIVATE MESSAGES
 };//FDISSET FILE
