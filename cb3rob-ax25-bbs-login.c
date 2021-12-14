@@ -536,7 +536,7 @@ if(!FD_ISSET(STDOUT_FILENO,&writefds))sleep(1);//HAVE CPU DO OTHER THINGS. THIS 
 close(ffd);
 //STDIN BACK TO BLOCKING MODE TO BE SURE
 if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK)){printf("SYSTEM ERROR\r");};
-printf("\rBINSEND FILE: %s BYTES: %ld\r\r",name,statbuf.st_size);
+printf("\rBGET FILE: %s BYTES: %ld\r\r",name,statbuf.st_size);
 return(statbuf.st_size);
 };//CMDBGET
 
@@ -553,14 +553,17 @@ ssize_t cmdbput(char*bincmd,char*username){
 int n;
 int f;
 int c;
+int filenameoffset;
 int ffd;
 ssize_t rbytes;
 ssize_t wbytes;
 ssize_t remain;
 struct stat statbuf;
 uint8_t buf[256];
+uint8_t filename[256];
 uint16_t crc;
 int parsefield;
+memset(&filename,0,sizeof(filename));
 parsefield=0;
 sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);//DENY UPLOAD
 for(n=0;(bincmd[n]!=0)&&(bincmd[n]!='\r');n++){
@@ -579,7 +582,13 @@ if(remain<1){sync();sleep(1);write(STDOUT_FILENO,"#NO#EMPTYFILE\r",5);sync();sle
 printf("FILE SIZE: %ld\r",remain);
 };//FILE LENGTH
 //IGNORE CRC AND FILE CREATION FOR NOW. FILE CREATION ISN'T 2038 BUG COMPLIANT ANYWAY AS IT'S A 32 BIT TIMESTAMP OF UNCLEAR ENDIANITY
-if(parsefield==4)printf("FILE NAME: %s\r",buf);
+if(parsefield==4){
+printf("FILE NAME IN: %s\r",buf);
+filenameoffset=0;
+for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if(buf[c]=='\')||(buf[c]=='/')filenameoffset=c;
+snprintf(filename,sizeof(filename)-1,"%s-%s",user,&filename+filenameoffset);
+printf("FILE NAME OUT: %s\r",filename);
+};
 n=n+f;//FAST FORWARD N COUNTER TO NEXT DELIMITER
 n--;//PUT N BACK WHERE WE FOUND IT SO WE DON'T SKIP SEGMENTS
 parsefield++;
@@ -588,12 +597,42 @@ parsefield++;
 
 printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");return(-1);
 
-//IF PARSEFIELD==5 BUF NOW CONTAINS FILENAME AS IF THERE WAS ONE (BIN WITHOUT AUTO PROTOCOL HAS NONE) THAT IS THE LAST FIELD
-//STRIP IT DOWN SO IT HAS NO PATH, IS UPPER CASE, COMPLIES TO OUR NAMING CONVENTIONS, AND TRY TO EXCL OPEN WRITE.
-//SOMEHOW FIGURE OUT A WAY NOT TO ATTACH IT TO THE FILESYSTEM LIKE WITH O_TMPFILE SO USERS CAN'T SEE OR USE A SPECIAL EXTENSION THEY CAN'T SEE UNTIL UPLOAD COMPLETED
-
-//fclose(ffd);
-return(wbytes);
+while(remain>0){
+tv.tv_sec=10;
+tv.tv_usec=0;
+FD_ZERO(&readfds);
+FD_ZERO(&writefds);
+FD_SET(STDIN_FILENO,&readfds);
+FD_SET(STDOUT_FILENO,&writefds);
+FD_SET(ffd,&readfds);
+nfds=STDIN_FILENO;
+if(STDOUT_FILENO>nfds)nfds=STDOUT_FILENO;
+if(ffd>nfds)nfds=ffd;
+select(nfds+1,&readfds,&writefds,NULL,&tv);
+//HANDLE ABORT -BEFORE SENDING DATA-, IGNORE ANYTHING ELSE THAT COMES IN, AS PER SPECIFICATION
+if(FD_ISSET(STDIN_FILENO,&readfds)){
+memset(&buf,0,sizeof(buf));
+if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
+for(n=0;(n<sizeof(buf)-7)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST # (ABORT IS SUPPOSED TO BE BETWEEN 2 \r's IN A PACKET OF IT'S OWN BUT WE'RE LESS PICKY)
+if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
+};//IF DATA
+};//FD_ISSET PTY
+//SEND DATA - AND YES WE MUST CHECK IF THE PTY IS READY TO TAKE IT OR THINGS GO REALLY BONKERS
+if(FD_ISSET(ffd,&readfds)&&FD_ISSET(STDOUT_FILENO,&writefds)){
+rbytes=read(ffd,&buf,sizeof(buf));
+if(rbytes<1){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BGET ABORTED: %s FILE READ ERROR\r\r",name);return(-1);};
+remain-=rbytes;
+wbytes=write(STDOUT_FILENO,&buf,rbytes);
+if(wbytes<rbytes){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BGET ABORTED: %s DATA TRANSMIT ERROR\r\r",name);return(-1);};
+};//FDISSET FILE
+//BANGING THE CPU A BIT HERE IF THE PTY IS -NOT- READY TO ACCEPT MORE DATA (STDOUT -> PTY (BUFFER) -> MASTER -> SENDCLIENT() (BUFFER TO SLOW NETWORK) -> USUALLY SLLOOWWW CLIENT ALSO TRYING TO CRC IT)
+if(!FD_ISSET(STDOUT_FILENO,&writefds))sleep(1);//HAVE CPU DO OTHER THINGS. THIS WHOLE THING IS SINGLE TASKING ANYWAY.
+};//WHILE DATA LEFT TO SEND
+close(ffd);
+//STDIN BACK TO BLOCKING MODE TO BE SURE
+if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK)){printf("SYSTEM ERROR\r");};
+printf("\rBPUT FILE: %s BYTES: %ld\r\r",name,statbuf.st_size);
+return(wtotal);
 };//CMDBPUT
 
 
