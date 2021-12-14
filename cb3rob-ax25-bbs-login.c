@@ -488,13 +488,13 @@ FD_SET(STDIN_FILENO,&readfds);
 select(STDIN_FILENO+1,&readfds,NULL,NULL,&tv);
 if(FD_ISSET(STDIN_FILENO,&readfds))
 //'STATION A SHOULD IGNORE ANY DATA NOT BEGINNING WITH #OK# OR #NO#' - AS WE ARE RUNNING ON A PTY WE CAN'T BE ABSOLUTELY SURE OF AX.25 FRAME LIMITS THOUGH.
-while(read(STDIN_FILENO,&buf,1)>0)if(buf[0]=='#')if(read(STDIN_FILENO,&buf+1,6)>0){
+if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
 if(!bcmp(&buf+n,"#NO#",4)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
 //GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
 if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
 if(!bcmp(&buf+n,"#OK#",4))break;
 };//HANDLE OK OR NOT OK
-};//WAIT FOR #OK# OR #NO#
+};//WHILE FETCH DATA
 //PEER HAS TO ACCEPT WITHIN 1 MINUTE - ALSO AT LEAST TRY TO FORCE THE PTY TO SEND THE ABORT IN IT'S VERY OWN PACKET AS PER DOCUMENTATION...
 if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BGET: %s TIMED OUT\r\r",name);return(-1);};
 //MOVE TOTAL BYTES TO TRANSFER INTO SUBSTRACTION REGISTER
