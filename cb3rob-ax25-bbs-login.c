@@ -389,7 +389,7 @@ if((direntry->d_name[0]>=0x30&&direntry->d_name[0]<=0x39)||(direntry->d_name[0]>
 switch(direntry->d_type){
 case DT_REG:
 if(stat(direntry->d_name,&filestat)==-1){printf("ERROR ON FILESTAT%s\r",direntry->d_name);continue;};
-printf("%s %lu\r",direntry->d_name,filestat.st_size);
+if(filestat.st_size>0){printf("%s %lu\r",direntry->d_name,filestat.st_size);//DON'T SHOW EMPTY FILES RESERVED DURING UPLOAD
 total+=filestat.st_size;
 files++;
 continue;
