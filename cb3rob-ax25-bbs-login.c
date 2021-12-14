@@ -389,7 +389,7 @@ if((direntry->d_name[0]>=0x30&&direntry->d_name[0]<=0x39)||(direntry->d_name[0]>
 switch(direntry->d_type){
 case DT_REG:
 if(stat(direntry->d_name,&filestat)==-1){printf("ERROR ON FILESTAT%s\r",direntry->d_name);continue;};
-if(filestat.st_size>0){printf("%s %lu\r",direntry->d_name,filestat.st_size);//DON'T SHOW EMPTY FILES RESERVED DURING UPLOAD
+if(filestat.st_size>0)printf("%s %lu\r",direntry->d_name,filestat.st_size);//DON'T SHOW EMPTY FILES RESERVED DURING UPLOAD
 total+=filestat.st_size;
 files++;
 continue;
@@ -560,7 +560,6 @@ ssize_t remain;
 struct stat statbuf;
 uint8_t buf[256];
 uint16_t crc;
-size_t rsize;
 int parsefield;
 parsefield=0;
 sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);//DENY UPLOAD
@@ -572,11 +571,12 @@ memset(&buf,0,sizeof(buf));
 for(f=0;((n+f)<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd[n+f]!='#');f++)buf[f]=bincmd[n+f];
 printf("FIELD: %d: [%s]\r",parsefield,buf);
 if(parsefield==0)if(strcmp(&buf,"BIN")){sync();sleep(1);write(STDOUT_FILENO,"#NO#PROTOCOL\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
+
 if(parsefield==1){//FILE LENGTH
 for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<0x30)||(buf[c]>0x39)){sync();sleep(1);write(STDOUT_FILENO,"#NO#PROTOCOL\r",5);sync();sleep(1);return(-1);};//NOT A DECIMAL NUMBER
-remain=atol(buf);
+remain=atoll(buf);
 if(remain<1){sync();sleep(1);write(STDOUT_FILENO,"#NO#EMPTYFILE\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
-printf("FILE SIZE: %d\r",remain);
+printf("FILE SIZE: %ld\r",remain);
 };//FILE LENGTH
 //IGNORE CRC AND FILE CREATION FOR NOW. FILE CREATION ISN'T 2038 BUG COMPLIANT ANYWAY AS IT'S A 32 BIT TIMESTAMP OF UNCLEAR ENDIANITY
 if(parsefield==4)printf("FILE NAME: %s\r",buf);
@@ -585,15 +585,17 @@ n--;//PUT N BACK WHERE WE FOUND IT SO WE DON'T SKIP SEGMENTS
 parsefield++;
 };//FOR FIELDCOPY
 };//FOR BYTE
+
 printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");return(-1);
 
 //IF PARSEFIELD==5 BUF NOW CONTAINS FILENAME AS IF THERE WAS ONE (BIN WITHOUT AUTO PROTOCOL HAS NONE) THAT IS THE LAST FIELD
 //STRIP IT DOWN SO IT HAS NO PATH, IS UPPER CASE, COMPLIES TO OUR NAMING CONVENTIONS, AND TRY TO EXCL OPEN WRITE.
 //SOMEHOW FIGURE OUT A WAY NOT TO ATTACH IT TO THE FILESYSTEM LIKE WITH O_TMPFILE SO USERS CAN'T SEE OR USE A SPECIAL EXTENSION THEY CAN'T SEE UNTIL UPLOAD COMPLETED
 
-fclose(ffd);
-
+//fclose(ffd);
+return(wbytes);
 };//CMDBPUT
+
 
 int main(int argc,char**argv){
 int n;
