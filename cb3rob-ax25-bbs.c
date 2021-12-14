@@ -690,6 +690,7 @@ int parsefield;
 memset(&name,0,sizeof(name));
 parsefield=0;
 okreturn=0;
+remain=0;
 if((bincmd==NULL)||(username==NULL))return(-1);
 for(n=0;(bincmd[n]!=0)&&(bincmd[n]!='\r');n++){
 if(bincmd[n]=='#'){
