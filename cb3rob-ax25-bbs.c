@@ -3,33 +3,46 @@
 //One CyberBunker Avenue
 //Republic CyberBunker
 
-// 'TELNETD' FOR AX.25 - STARTS BBS SHELL ENVIRONMENT ON A PTY
-
 //ALPHA DEVELOPMENT STATUS - UNDER CONSTRUCTION - NO ASSUMPTIONS TOWARDS SECURITY
 
 //root 9254  0.0  0.0   6592   808 pts/0    S+   12:51   0:00  \_ ./cb3rob-ax25-bbs KISSMX                <--- MAIN LISTEN DAEMON
 //root 9289  0.0  0.0  15048  1832 pts/0    S+   12:52   0:00      \_ ./cb3rob-ax25-bbs KISSMX            <--- CHILD AX.25 HANDLER
-//root 9290  0.0  0.0  85036  4544 pts/4    Ss   12:52   0:00          \_ /usr/sbin/cb3rob-ax25-bbs-login <--- CHILD PTY HANDLER EXEC
 
+#define _GNU_SOURCE
+#include<crypt.h>
+#include<dirent.h>
 #include<fcntl.h>
+#include<grp.h>
 #include<linux/ax25.h>
+#include<pwd.h>
+#include<signal.h>
+#include<stdint.h>
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<sys/resource.h>
 #include<sys/socket.h>
+#include<sys/stat.h>
 #include<sys/time.h>
 #include<sys/types.h>
+#include<termios.h>
 #include<time.h>
 #include<unistd.h>
-#include<stdint.h>
 #include<utmp.h>
-#include<termios.h>
-#include<pty.h>
 #include<wait.h>
-#include<signal.h>
 
 #define MAXBACKLOG 16
+#define BPNLCR 1
 
+time_t logintime;
+char user[7];
+uid_t uid;
+gid_t gid;
+fd_set readfds;
+fd_set writefds;
+struct timeval tv;
+int nfds;
+char homedir[256];
 int bsock;
 int csock;
 char tbuf[(AX25_MTU*7)];//MORE EFFECTIVE THROUGHPUT WHEN SENDING IN BURST
@@ -39,8 +52,6 @@ struct sigaction sigact;
 socklen_t clen;
 fd_set writefds;
 fd_set readfds;
-struct timeval tv;
-int nfds;
 
 char sourcecall[10];
 char destcall[10];
@@ -164,17 +175,6 @@ break;
 };//WHILE NOT SOCKET LOOP
 };//SETUPSOCK
 
-void termclient(int csock,int master,pid_t ptychild){
-printf("%s CLIENT %d TERMINATING\n",srcbtime(0),getpid());
-memset(&tbuf,0,sizeof(tbuf));
-if(csock!=-1){printf("%s CLIENT %d CLOSING SOCKET %d\n",srcbtime(0),getpid(),csock);close(csock);csock=-1;};
-//KILL LOGIN BEFORE CLOSING MASTER
-if(ptychild!=-1){printf("%s CLIENT %d KILLING LOGIN %d\n",srcbtime(0),getpid(),ptychild);kill(ptychild,SIGTERM);sleep(10);kill(ptychild,SIGKILL);ptychild=-1;};
-if(master!=-1){printf("%s CLIENT %d CLOSING MASTER %d\n",srcbtime(0),getpid(),master);close(master);master=-1;};
-printf("%s CLIENT %d TERMINATED\n",srcbtime(0),getpid());
-exit(EXIT_SUCCESS);
-};//TERMCLIENT
-
 //SEND BEACON TO KEEP DYNAMIC ROUTES TO US OPEN IN TIMES OF INACTIVITY
 void sendbeacon(int signum){
 int beacon;
@@ -202,107 +202,641 @@ close(beacon);
 };//IF SOCKET
 };//BEACON
 
+//ALLOWS 8.3 FILENAMES WITH A-Z0-9 AND NOTHING ELSE
+//FOR MKDIR AND FILE WRITES ONLY... DOESN'T ALLOW RELATIVE PATHS
+int chkpath(char*path){
+int remain;
+int dotcount;
+if(path==NULL)return(-1);
+if(path[0]==0)return(-1);
+//INIT
+remain=8;
+dotcount=0;
+//SKIP LEADING SLASH NEUTRALLY
+if(path[0]=='/')path++;//SKIP LEADING SINGLE SLASH
+while(path[0]){//CONTINUE UNTIL END OF STRING
+if((remain==8)&&(path[0]=='.'))return(-1);//NO DOTS AS FIRST CHARACTER
+if((remain==8)&&(path[0]=='/'))return(-1);//NO DOUBLE SLASHES EITHER
+if(path[0]=='/'){remain=8;dotcount=0;path++;continue;};
+if(path[0]=='.'){remain=3;dotcount++;path++;};
+if(remain==0)return(-1);//TOO LONG
+if(dotcount>1)return(-1);//TOO LONG
+//THIS WILL ALSO FETCH ANY . OR / IMMEDIATELY FOLLOWING ANOTHER . OR /
+if(path[0]){//EOL?
+if((path[0]<0x30)||(path[0]>0x5A)||((path[0]>0x39)&&(path[0]<0x41)))return(-1);
+//ONLY INCREMENT IF WE HAVEN'T REACHED END OF LINE YET
+remain--;
+path++;
+};//EOL CHECK
+};//WHILE PATH
+return(0);
+};//CHKPATH
+
+int chkcall(char*c){
+int n;
+if(c==NULL)return(-1);
+if((c[0]<0x30)||(c[0]>0x5A)||((c[0]>0x39)&&(c[0]<0x41)))return(-1);//MUST START WITH A-Z0-9
+for(n=1;(n<6)&&(c[n])&&(c[n]!=0x2D);n++){
+if((c[n]<0x30)||(c[n]>0x5A)||((c[n]>0x39)&&(c[n]<0x41)))return(-1);//MUST START WITH A-Z0-9
+}//
+if(c[n]==0)return(n);//NO SSID - WE'RE DONE
+if(c[n++]!=0x2D)return(-1);//SOMETHING INVALID
+if((c[n]<0x30)||(c[n]>0x39))return(-1);//MUST BE 0-9
+n++;
+if(c[n]==0)return(n);//DONE - VALID WITH 1 DIGIT SSID
+if(c[n-1]!=0x31)return(-1);//IF WE HAVE ANOTHER SSID-DIGIT THE FIRST DIGIT MUST BE 1
+if((c[n]<0x30)||(c[n]>0x35))return(-1);//MUST BE 0-5
+n++;
+if(c[n]==0)return(n);//NO SSID
+return(-1);//FALLTHROUGH INVALID
+};//CHKCALL
+
+ssize_t readfile(const char*filename,int asciimode){
+uint8_t buf[512];
+int ffd;
+ssize_t rbytes;
+ssize_t wbytes;
+ssize_t total;
+int n;
+if(filename==NULL)return(-1);
+ffd=open(filename,O_RDONLY,0);
+if(ffd==-1)return(-1);
+total=0;
+wbytes=0;
+rbytes=0;
+while((rbytes=read(ffd,&buf,sizeof(buf)))>1){
+if(asciimode&BPNLCR)for(n=0;n<rbytes;n++)if(buf[n]=='\n')buf[n]='\r';
+if((wbytes=write(csock,&buf,rbytes))<1)break;
+sync();
+total+=wbytes;
+};//WHILE READBLOCK
+close(ffd);
+//CLEAR MEMORY
+memset(&buf,0,sizeof(buf));
+if(wbytes<1)return(-1);
+return(total);
+};//READFILE
+
+void printstatus(){
+dprintf(csock,"TIME: %s\rCALL: %s\rUSER: %s\rNODE: %s\r\r",srcbtime(0),sourcecall,user,destcall);
+};//PRINTWELCOME
+
+void printwelcome(){
+dprintf(csock,"=====================\rWelcome to MuTiNy BBS\r=====================\r");
+};//PRINTBANNER
+
+void printprompt(){
+dprintf(csock,"[ %s @ %s : %s ]> ",user,destcall,getcwd(NULL,0));
+};//PRINTPROMPT
+
+char*getcommand(){
+static unsigned char cmd[128];
+int n;
+memset(&cmd,0,sizeof(cmd));
+if(read(csock,(void*)&cmd,sizeof(cmd)-1)<1)return(NULL);
+for(n=0;(n<sizeof(cmd))&&(cmd[n]);n++){
+if((cmd[n]=='\r')||(cmd[n]=='\n')){cmd[n]=0;break;};
+if(cmd[n]==0x09){cmd[n]=0x20;continue;};//HTAB TO SPACE
+if((cmd[n]>=0x61)&&(cmd[n]<=0x7A)){cmd[n]&=0xDF;continue;};//ALL TO UPPER CASE
+if((cmd[n]<0x20)||cmd[n]>0x7E){cmd[n]=0x20;continue;};//NO WEIRD BINARY STUFF
+//if((n==0)&&((cmd[n]==0x20)||(cmd[n]=='\r'))){cmd[n]=0;n--;continue;};//NO SPACES OR ENTERS AT START OF LINE
+};//FOR
+dprintf(csock,"\rCOMMAND: %s\r\r",cmd);//PRINT IT IN CASE USER HAS ECHO OFF IN HIS TERMINAL
+return((char*)&cmd);
+};//GETCOMMAND
+
+int inituser(char*username){
+char directory[256];
+char basepath[]="/var/bbs";
+struct rlimit rlim;
+struct passwd *pw;
+struct passwd pwa;
+if(username==NULL)return(-1);
+// RLIMIT_CPU     /* CPU time in seconds */
+// RLIMIT_FSIZE   /* Maximum filesize */
+// RLIMIT_DATA    /* max data size */
+// RLIMIT_STACK   /* max stack size */
+// RLIMIT_CORE    /* max core file size */
+// RLIMIT_RSS     /* max resident set size */
+// RLIMIT_NPROC   /* max number of processes */
+// RLIMIT_NOFILE  /* max number of open files */
+// RLIMIT_MEMLOCK /* max locked-in-memory address space*/
+rlim.rlim_cur=RLIM_INFINITY;
+rlim.rlim_max=RLIM_INFINITY;
+setrlimit(RLIMIT_CPU,&rlim);
+rlim.rlim_cur=0;
+rlim.rlim_max=0;
+setrlimit(RLIMIT_CORE,&rlim);
+rlim.rlim_cur=256;
+rlim.rlim_max=256;
+setrlimit(RLIMIT_NOFILE,&rlim);
+rlim.rlim_cur=8388608;
+rlim.rlim_max=8388608;
+setrlimit(RLIMIT_STACK,&rlim);
+rlim.rlim_cur=16;
+rlim.rlim_max=16;
+setrlimit(RLIMIT_NPROC,&rlim);
+rlim.rlim_cur=33554432;
+rlim.rlim_max=33554432;
+setrlimit(RLIMIT_DATA,&rlim);
+setrlimit(RLIMIT_MEMLOCK,&rlim);
+setrlimit(RLIMIT_FSIZE,&rlim);
+setrlimit(RLIMIT_RSS,&rlim);
+//SLOW EM DOWN A BIT JUST IN CASE
+nice(+19);
+//NEED THIS FOR USER CREATION ANYWAY
+memset(&homedir,0,sizeof(homedir));
+snprintf(homedir,sizeof(homedir)-1,"%s/MEMBERS/%s",basepath,username);
+uid=65535;
+gid=65535;
+FILE*fp;
+struct group *gp;
+struct group gpa;
+gp=getgrnam("MUTINY");
+if(gp==NULL){
+gpa.gr_name="MUTINY";
+gpa.gr_passwd="x";
+gpa.gr_mem=NULL;
+};//IF GP NULL
+while(gp==NULL){
+for(gpa.gr_gid=1000;getgrgid(gpa.gr_gid)!=NULL;gpa.gr_gid++);
+fp=fopen("/etc/group","a");
+putgrent(&gpa,fp);
+fclose(fp);
+gp=getgrnam("MUTINY");
+};//WHILE GP NULL
+
+//WE HAVE OUR GID
+gid=gp->gr_gid;
+
+pw=getpwnam(username);
+if(pw==NULL){
+char salt[3];
+srand(time(NULL));
+salt[0]=(rand()&0x3F)+0x2E;
+if(salt[0]>0x39)salt[0]+=0x07;
+if(salt[0]>0x5A)salt[0]+=0x06;
+salt[1]=(rand()&0x3F)+0x2E;
+if(salt[1]>0x39)salt[1]+=0x07;
+if(salt[1]>0x5A)salt[1]+=0x06;
+salt[2]=0x00;
+memset(&pwa,0,sizeof(struct passwd));
+pwa.pw_name=username;
+pwa.pw_passwd=crypt(username,salt);
+pwa.pw_dir=homedir;
+pwa.pw_gid=gid;
+pwa.pw_shell="/bin/false";
+};//IF PW NULL
+while(pw==NULL){
+dprintf(csock,"NO USERDATA FOUND FOR USERNAME %s - CREATING...\r",username);
+for(pwa.pw_uid=10000;getpwuid(pwa.pw_uid)!=NULL;pwa.pw_uid++);
+//EHM YEAH. SHOULD USE THE SAME FILE LOCKING AND TEMPORARY FILE MECHANISM passwd USES HERE..
+//BUT... STDIO BUFFERING... ETC.
+//ALSO WE COULD END UP WITH 2 USERS WITH THE SAME UID IF 2 ARE CREATED AT EXACTLY THE SAME TIME
+//THE EASIER OPTION IS TO JUST CONVERT THEIR CALLSIGN FROM THE MAX 6 DIGIT BASE 36 INTEGER THAT IT REALLY INTO A UID IS AND USE THAT
+//MOST SYSTEMS WILL HAVE LARGER THAN 16 BIT UID'S ANYWAY NOWADAYS. IT FITS A 32 BIT UID AND ENSURES UNIQUENESS.
+fp=fopen("/etc/passwd","a");
+putpwent(&pwa,fp);
+//putspent(
+fclose(fp);
+pw=getpwnam(username);
+};//WHILE PW NULL
+
+//WE HAVE OUR UID TOO
+uid=pw->pw_uid;
+
+dprintf(csock,"FOUND USERDATA UID: %d GID: %d\r",uid,gid);
+//WE'LL GET TO THIS LATER. THEY'RE SET TO THE USERS CALLSIGN WITHOUT SSID FOR NOW
+//WITH A SHELL THAT DENIES THEM ACCESS TO THE UNIX SHELL (COULD STILL GRANT THEM ACCCESS TO OTHER SERVICES!)
+dprintf(csock,"NO PASSWORD FOR USER: %s SET SO NOT ASKING\r",username);
+
+
+memset(&directory,0,sizeof(directory));
+//MAKE SURE THE SYSTEM IS INITIALIZED AND ALL DIRECTORIES EXIST (TAKES LONGER TO CHECK THAN TO JUST TRY TO CREATE THEM IF NOT ;)
+//SOOO MANY UNCHECKED RETURN VALUES... WHO CARES, GCC.. IT DOES IT UPON EVERY SINGLE LOGIN ANYWAY. AND IF THE DRIVE IS FULL IT'S FULL.
+mkdir(basepath,00750);//EVERYTHING EXCEPT FOR /BIN SHOULD ACTUALLY BE ON A FILESYSTEM MOUNTED WITH NO EXECUTE BUT WE CAN'T DO THAT FROM HERE
+chmod(basepath,00750);//FORCE FIX PERMISSIONS ON EXISTING DIRECTORIES
+chown(basepath,0,gid);
+snprintf(directory,sizeof(directory)-1,"%s/ETC",basepath);
+mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE - DATA FILES TO BE READ BY THIS PROGRAM
+chmod(directory,00710);
+chown(directory,0,gid);
+snprintf(directory,sizeof(directory)-1,"%s/BIN",basepath);
+mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE - EXTERNAL PROGRAMS TO BE CALLED BY THIS ONE
+chmod(directory,00710);
+chown(directory,0,gid);
+snprintf(directory,sizeof(directory)-1,"%s/UPLOAD",basepath);
+mkdir(directory,01750);//SET STICKY BIT - TEMP FILES DURING UPLOADS
+chmod(directory,01750);//PROBABLY NONE OF THE USERS CONCERN. CONTAINS UNFINISHED TEMPORARY FILES
+chown(directory,0,gid);//MAYBE DO THIS WITH O_TMPFILE INSTEAD
+snprintf(directory,sizeof(directory)-1,"%s/FILES",basepath);
+mkdir(directory,01750);//SET STICKY BIT - USERS CAN REMOVE FILES THEY UPLOADED
+chmod(directory,01750);
+chown(directory,0,gid);
+snprintf(directory,sizeof(directory)-1,"%s/MEMBERS",basepath);
+mkdir(directory,00750);//USER HOMEDIRECTORIES
+chmod(directory,00750);
+chown(directory,0,gid);
+snprintf(directory,sizeof(directory)-1,"%s/MAIL",basepath);
+mkdir(directory,00750);//USER MAIL
+chmod(directory,00750);
+chown(directory,0,gid);
+snprintf(directory,sizeof(directory)-1,"%s/ANARCHY",basepath);
+mkdir(directory,01770);//DO WHATEVER THEY LIKE
+chmod(directory,01770);
+chown(directory,0,gid);
+memset(&directory,0,sizeof(directory));
+//SYSTEM HOMEDIR NAME OF USER GENERATED ABOVE IN THE USER CREATION PART
+mkdir(homedir,00700);
+chmod(homedir,00700);
+chown(homedir,uid,gid);
+//HOMEDIR NAME FOR USE WITHIN THE CHROOT
+snprintf(homedir,sizeof(homedir)-1,"/MEMBERS/%s",username);
+//CHROOT
+chroot(basepath);
+chdir(homedir);
+//DROP ROOT
+setgroups(1,&gid);
+setegid(gid);
+setgid(gid);
+setuid(uid);
+seteuid(uid);
+return(0);
+};//INITUSER;
+
+int cmdbye(char*username){
+dprintf(csock,"SEE YOU AGAIN SOON %s\r\r",username);
+sync();
+sleep(10);
+exit(EXIT_SUCCESS);
+};//CMDBYE
+
+void cmdinvalid(){
+dprintf(csock,"INVALID COMMAND - TRY HELP\r\r");
+};//CMDINVALID
+
+void cmdhelp(){
+dprintf(csock,"DIR   [PATH]  - LISTS FILES\r");
+dprintf(csock,"CD    [PATH]  - CHANGES DIRECTORY\r");
+dprintf(csock,"MD    <PATH>  - CREATES DIRECTORY\r");
+dprintf(csock,"RM    <PATH>  - REMOVES FILE OR EMPTY DIRECTORY\r");
+dprintf(csock,"READ  <PATH>  - READS TEXT FILE\r");
+dprintf(csock,"BGET  <PATH>  - DOWNLOAD FILE USING THE #BIN# PROTOCOL\r");
+dprintf(csock,"EXIT          - TERMINATES SESSION\r");
+dprintf(csock,"\rPATHNAMES ARE 8.3 FORMAT [ A-Z 0-9 ]\r\r");
+//dprintf(csock,"AUTOBIN UPLOADS CAN BE STARTED WHILE ON THE PROMPT\r");
+//prrint("UPLOADS TO YOUR HOMEDIR OR /FILES OR /ANARCHY ONLY\r");
+};//CMDHELP
+
+int cmddir(char*name){
+DIR*curdir;
+struct dirent*direntry;
+struct stat filestat;
+size_t total;
+size_t files;
+size_t dirs;
+int n;
+if(name==NULL)name=getcwd(NULL,0);
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(!name[0])name=getcwd(NULL,0);
+total=0;
+files=0;
+dirs=0;
+curdir=opendir(name);
+if(curdir==NULL){dprintf(csock,"ERROR OPENING DIRECTORY: %s\r\r",name);return(-1);};//ERROR
+dprintf(csock,"DIRECTORY OF %s\r\r",name);
+dprintf(csock,"./\r");
+dprintf(csock,"../\r");
+while((direntry=readdir(curdir))!=NULL){
+if((direntry->d_name[0]>=0x30&&direntry->d_name[0]<=0x39)||(direntry->d_name[0]>=0x41&&direntry->d_name[0]<=0x5A)||(direntry->d_name[0]>=0x61&&direntry->d_name[0]<=0x7A)){
+switch(direntry->d_type){
+case DT_REG:
+if(stat(direntry->d_name,&filestat)==-1){dprintf(csock,"ERROR ON FILESTAT%s\r",direntry->d_name);continue;};
+if(filestat.st_size>0)dprintf(csock,"%s %lu\r",direntry->d_name,filestat.st_size);//DON'T SHOW EMPTY FILES RESERVED DURING UPLOAD
+total+=filestat.st_size;
+files++;
+continue;
+case DT_DIR:
+dprintf(csock,"%s/\r",direntry->d_name);
+dirs++;
+continue;
+default:
+continue;
+};//SWITCH ENTRY TYPE
+};//VALID FILENAME
+};//WHILE DIRENTRY
+if(closedir(curdir)==-1)dprintf(csock,"ERROR CLOSING DIRECTORY\r");//ERROR;
+dprintf(csock,"\rTOTAL: %lu BYTES IN: %lu FILES AND %lu DIRECTORIES\r\r",total,files,dirs);
+return(0);
+};//CMDDIR
+
+void cmdchdir(char*name){
+int n;
+if(name!=NULL){
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(name[0]){//JUST SHOW PWD
+if(chdir(name))dprintf(csock,"CHDIR TO %s FAILED\r",name);
+};//IF PARAMETERS OTHER THAN SPACE
+};//IF PARAMETERS
+dprintf(csock,"CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
+};//CMDCHDIR
+
+void cmdmkdir(char*name){
+int n;
+if(name!=NULL){
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(chkpath(name)==-1)dprintf(csock,"INVALID ABSOLUTE 8.3 FORMAT [A-Z 0-9] PATH: %s\r",name);
+else if(mkdir(name,00750))dprintf(csock,"CREATE DIRECTORY %s FAILED\r",name);
+else chdir(name);//WE CD INTO IT DIRECTLY
+dprintf(csock,"CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
+};//IF PARAMETERS
+};//CMDMKDIR
+
+void cmderase(char*name){
+int n;
+if(name!=NULL){
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(chkpath(name)==-1)dprintf(csock,"INVALID ABSOLUTE 8.3 FORMAT [A-Z 0-9] PATH: %s\r",name);
+else if(remove(name))dprintf(csock,"ERASE %s FAILED\r",name);
+dprintf(csock,"CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
+};//IF PARAMETERS
+};//CMDERASE
+
+void cmdtest(){
+int n;
+for(n=0;n<100;n++)dprintf(csock,"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+};//CMDTEST
+
+ssize_t cmdbget(char*name){
+int n;
+int ffd;
+ssize_t rbytes;
+ssize_t wbytes;
+ssize_t remain;
+struct stat statbuf;
+uint8_t buf[AX25_MTU];
+if(name==NULL)return(-1);
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(!name[0])return(-1);
+//FLUSH STDIN
+if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK)){dprintf(csock,"SYSTEM ERROR\r\r");return(-1);};
+while(read(csock,&buf,sizeof(buf))>0);//FLUSH STDIN TO MAKE SURE PEERS #OK# IS AT THE START OF RECEPTION
+if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)&~O_NONBLOCK)){dprintf(csock,"SYSTEM ERROR\r\r");return(-1);};
+//OPEN FILE
+ffd=open(name,O_RDONLY,0);
+if(ffd==-1){dprintf(csock,"ERROR OPENING: %s\r\r",name);return(-1);};
+//FILE IS NOW OPEN
+if(fstat(ffd,&statbuf)==-1){close(ffd);dprintf(csock,"SYSTEM ERROR\r\r");return(-1);};
+if((!(statbuf.st_mode&S_IFMT&S_IFREG))||(statbuf.st_size==0)){close(ffd);dprintf(csock,"ERROR OPENING: %s\r\r",name);return(-1);};
+//START OUR SIDE
+sprintf((char*)&buf,"#BIN#%lu\r",statbuf.st_size);
+write(csock,&buf,strlen((char*)buf));
+
+//WAIT FOR PEER
+while(1){
+sync();
+tv.tv_sec=60;
+tv.tv_usec=0;
+FD_ZERO(&readfds);
+FD_SET(csock,&readfds);
+if(select(csock+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(csock,&readfds)){
+//'STATION A SHOULD IGNORE ANY DATA NOT BEGINNING WITH #OK# OR #NO#' - AS WE ARE RUNNING ON A PTY WE CAN'T BE ABSOLUTELY SURE OF AX.25 FRAME LIMITS THOUGH.
+memset(&buf,0,sizeof(buf));
+if(read(csock,&buf,sizeof(buf))>0){
+for(n=0;(n<sizeof(buf)-8)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST #, ALLOW -SOME- PLAYROOM FOR EVENTUAL '\r' AT THE START (ABORT DURING SETUP) AND OTHER CREATIVE INTERPRETATIONS
+if(!bcmp(buf+n,"#NO#",4)){close(ffd);dprintf(csock,"BGET %s REFUSED BY PEER\r\r",name);return(-1);};
+//GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
+if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);dprintf(csock,"BGET %s REFUSED BY PEER\r\r",name);return(-1);};
+if(!bcmp(buf+n,"#OK#",4))break;
+};//HANDLE OK OR NOT OK
+};//SELECT READ
+};//WHILE FETCH DATA
+
+//PEER HAS TO ACCEPT WITHIN 1 MINUTE - ALSO AT LEAST TRY TO FORCE THE PTY TO SEND THE ABORT IN IT'S VERY OWN PACKET AS PER DOCUMENTATION...
+if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BGET: %s TIMED OUT\r\r",name);return(-1);};
+//MOVE TOTAL BYTES TO TRANSFER INTO SUBSTRACTION REGISTER
+remain=statbuf.st_size;
+//WHILE BYTES TO SEND LEFT, SEND BLOCKS OF DATA
+while(remain>0){
+
+FD_ZERO(&readfds);
+FD_SET(ffd,&readfds);
+FD_SET(csock,&readfds);
+tv.tv_sec=10;
+tv.tv_usec=0;
+nfds=csock;
+if(csock>nfds)nfds=csock;
+if(ffd>nfds)nfds=ffd;
+if(select(nfds+1,&readfds,NULL,NULL,&tv)>0){
+//HANDLE ABORT -BEFORE SENDING DATA-, IGNORE ANYTHING ELSE THAT COMES IN, AS PER SPECIFICATION
+
+if(FD_ISSET(csock,&readfds)){
+memset(&buf,0,sizeof(buf));
+if(read(csock,&buf,sizeof(buf))>0){
+for(n=0;(n<sizeof(buf)-7)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST # (ABORT IS SUPPOSED TO BE BETWEEN 2 \r's IN A PACKET OF IT'S OWN BUT WE'RE LESS PICKY)
+if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
+};//IF READ
+};//FD_ISSET PTY
+
+//SEND DATA - AND YES WE MUST CHECK IF THE PTY IS READY TO TAKE IT OR THINGS GO REALLY BONKERS
+//WRITE BYTES
+if(FD_ISSET(ffd,&readfds)){
+FD_ZERO(&writefds);
+FD_SET(csock,&writefds);
+tv.tv_sec=0;
+tv.tv_usec=100000;
+if(select(csock+1,NULL,&writefds,NULL,&tv)>0)if(FD_ISSET(csock,&writefds)){
+rbytes=read(ffd,&buf,sizeof(buf));
+if(rbytes<1){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BGET ABORTED: %s FILE READ ERROR\r\r",name);return(-1);};
+remain-=rbytes;
+wbytes=write(csock,&buf,rbytes);
+if(wbytes<rbytes){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BGET ABORTED: %s DATA TRANSMIT ERROR\r\r",name);return(-1);};
+};//FDISSET WRITE
+};//FDISSET FDD READ
+
+};//SELECT READ FILEDESCRIPTORS
+};//WHILE DATA LEFT TO SEND
+close(ffd);
+dprintf(csock,"\rBGET FILE: %s BYTES: %ld\r\r",name,statbuf.st_size);
+return(statbuf.st_size);
+};//CMDBGET
+
+void cmdread(char*name){
+int n;
+if(name!=NULL){
+for(n=0;name[n]==0x20;n++);
+name=name+n;//STRIP LEADING SPACE
+if(name[0])dprintf(csock,"\rREAD: %ld BYTES\r\r",readfile(name,BPNLCR));else dprintf(csock,"ERROR OPENING: %s FILENAME?\r\r",name);
+};//IF PARAMETERS
+};//CMDCHDIR
+
+ssize_t cmdbput(char*bincmd,char*username){
+ssize_t n;
+ssize_t f;
+ssize_t c;
+ssize_t o;
+int ffd;
+ssize_t rbytes;
+ssize_t wbytes;
+ssize_t remain;
+ssize_t okreturn;
+uint8_t buf[AX25_MTU];
+char name[256];
+//uint16_t crc;
+int parsefield;
+memset(&name,0,sizeof(name));
+parsefield=0;
+okreturn=0;
+if((bincmd==NULL)||(username==NULL))return(-1);
+for(n=0;(bincmd[n]!=0)&&(bincmd[n]!='\r');n++){
+if(bincmd[n]=='#'){
+n++;//SKIP FIELD DELIMITER ITSELF
+memset(&buf,0,sizeof(buf));
+//COPY FIELD TO BUF
+for(f=0;((n+f)<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd[n+f]!='#');f++)buf[f]=bincmd[n+f];
+//dprintf(csock,"FIELD: %d: [%s]\r",parsefield,buf);
+if(parsefield==0)if(strcmp((char*)buf,"BIN")){sync();sleep(1);write(csock,"#NO#\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
+if(parsefield==1){//FILE LENGTH
+for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<0x30)||(buf[c]>0x39)){sync();sleep(1);write(csock,"#NO#\r",5);sync();sleep(1);return(-1);};//NOT A DECIMAL NUMBER
+remain=atoll((char*)buf);
+okreturn=remain;
+if(remain<1){sync();sleep(1);write(csock,"#NO#\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
+//dprintf(csock,"FILE SIZE: %ld\r",remain);
+};//FILE LENGTH FIELD
+//IGNORE CRC AND FILE CREATION FOR NOW. FILE CREATION ISN'T 2038 BUG COMPLIANT ANYWAY AS IT'S A 32 BIT TIMESTAMP OF UNCLEAR ENDIANITY
+if(parsefield==4){
+//dprintf(csock,"FILENAME IN: %s\r",buf);
+o=0;
+for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]==0x5C)||(buf[c]==0x2F))o=c+1;//FAST FORWARD TO LAST SLASH
+if(buf[o]!=0){//IF FILENAME AFTER SLASH
+for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if(buf[c]==0x09)buf[c]=0x20;//HTAB TO SPACE
+for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<=0x20)||(buf[c]>0x7E))buf[c]='_';//JUST CHANGE ANY NON PRINTABLE CRAP TO '_'
+for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]>=0x61)&&(buf[c]<=0x7A))buf[c]&=0xDF;//ALL TO UPPER CASE
+snprintf(name,sizeof(name)-1,"%s-%s",username,buf+o);
+//dprintf(csock,"FILENAME OUT: %s\r",name);
+};//ACTUAL FILENAME AFTER THE SLASH?
+};//FILENAME FIELD FOUND
+n=n+f;//FAST FORWARD N COUNTER TO NEXT DELIMITER
+n--;//PUT N BACK WHERE WE FOUND IT SO WE DON'T SKIP SEGMENTS
+parsefield++;
+};//FOR FIELDCOPY
+};//FOR BYTE
+//GENERATE RANDOM FILENAME IF NOT PRESENT OR INVALID
+memset(&buf,0,sizeof(buf));
+if(name[0]==0){
+for(n=0;n<8;n++)buf[n]=(rand()&0x0F)+0x41;
+buf[n++]=0x2D;
+buf[n++]='B';
+buf[n++]='I';
+buf[n++]='N';
+buf[n]=0x00;
+snprintf(name,sizeof(name)-1,"%s-%s",username,buf);
+//dprintf(csock,"FILENAME OUT: %s\r",name);
+//dprintf(csock,"ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");return(-1);
+};//FILENAME ZERO RANDOMIZER
+ffd=open(name,O_WRONLY|O_CREAT|O_EXCL,00640);
+if(ffd==-1){sync();sleep(1);write(csock,"#NO#\r",5);sync();sleep(1);dprintf(csock,"BPUT ABORTED: %s FILE CREATION ERROR - NO PERMISSION HERE OR FILE EXITS\r\r",name);return(-1);};
+//GIVE OK FOR TRANSFER
+sync();sleep(1);write(csock,"#OK#\r",5);sync();
+while(remain>0){
+tv.tv_sec=10;
+tv.tv_usec=0;
+FD_ZERO(&readfds);
+FD_SET(csock,&readfds);
+if(select(csock+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(csock,&readfds)){
+memset(&buf,0,sizeof(buf));
+rbytes=read(csock,&buf,sizeof(buf));
+if(rbytes<1){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BPUT ABORTED: %s DATA RECEIVE ERROR\r\r",name);return(-1);};
+//CHECK DATA FOR ABORT
+for(n=0;(n<sizeof(buf)-8)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST # (ABORT IS SUPPOSED TO BE BETWEEN 2 \r's IN A PACKET OF IT'S OWN BUT WE'RE LESS PICKY)
+if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r\r",name);return(-1);};
+//WRITE
+wbytes=write(ffd,&buf,rbytes);
+if(wbytes<rbytes){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BPUT ABORTED: %s FILE WRITE ERROR\r\r",name);return(-1);};
+remain-=wbytes;
+};//FDISSET FILE
+};//WHILE DATA LEFT TO SEND
+close(ffd);
+dprintf(csock,"\rBPUT FILE: %s BYTES: %ld\r\r",name,okreturn);
+return(okreturn);
+};//CMDBPUT
+
+void calltermclient(int signum){printf("%s CLIENT %d TRIGGERED %s\n",srcbtime(0),getpid(),(signum==SIGTERM?"SIGTERM":"SIGPIPE"));exit(signum);};
+
 int clientcode(){
-//FORK CHILD
-ssize_t bytes;
-struct termios trm;
-struct winsize wins;
-char slavetty[256];
-//NO CONTROL-C IN THE CHILD. JUST IN THE MAIN PROCESS
+int n;
+char*currentcmd;
 setsid();
 setpgid(0,0);
 signal(SIGINT,SIG_IGN);
-signal(SIGCHLD,SIG_DFL);//CHILD DOES CARE
-pid_t ptychild;ptychild=-1;
-int master;master=-1;
-void calltermclient(int signum){printf("%s CLIENT %d TRIGGERED %s\n",srcbtime(0),getpid(),(signum==SIGTERM?"SIGTERM":"SIGPIPE"));termclient(csock,master,ptychild);};
-//TERMINATE CLIENTS NICELY... SIGPIPE IS ACTUALLY NEEDED AS SEND() ON AX.25 SEQPACKET JUST HANGS WHEN THE OTHER SIDE IS GONE FIRST
 memset(&sigact,0,sizeof(struct sigaction));
 sigemptyset(&sigact.sa_mask);
 sigact.sa_handler=calltermclient;
-//NO CONTROL-C OR ANY SUCH NONSENSE BEFORE LOGIN IS FINISHED
 sigaction(SIGTERM,&sigact,NULL);
 sigaction(SIGPIPE,&sigact,NULL);
-
 fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)&~O_NONBLOCK);
 printf("%s CLIENT %d CONNECTED\n",srcbtime(0),getpid());
 printf("%s CLIENT %d SOCKET: %d\n",srcbtime(0),getpid(),csock);
 memset(&tbuf,0,sizeof(tbuf));
 addresstoascii(&caddr.fsa_ax25.sax25_call,sourcecall);
-snprintf(tbuf,sizeof(tbuf)-1,"%s %s -> %s\r\r",srcbtime(0),sourcecall,destcall);
-if(sendclient(tbuf,0)<0)termclient(csock,master,ptychild);
+dprintf(csock,"%s %s -> %s\r\r",srcbtime(0),sourcecall,destcall);
 memset(&tbuf,0,sizeof(tbuf));
-memset(&trm,0,sizeof(struct termios));
-//SET SOME BASIC TERMIOS STUFF TO AT LEAST GET CRNL - TERMIOS DOESN'T SEEM TO DO JUST CARRIAGE RETURN ONLY
-//PACKET RADIO PROGRAMS PREFER CARRIAGE RETURN ONLY BUT WILL IGNORE NEWLINE (OR SHOULD).
-//FILE TRANSFER PROGRAMS DEMAND 8 BIT TRANSPARENCY.
-cfmakeraw(&trm);
-trm.c_iflag|=ICRNL;
-trm.c_oflag|=ONLCR|OPOST;
-memset(&wins,0,sizeof(struct winsize));
-wins.ws_row=24;
-wins.ws_col=80;
-ptychild=forkpty(&master,slavetty,&trm,&wins);
-if(ptychild==0){
-//CHILD (LOGIN)
-close(csock);csock=-1;//DON'T WANT THAT HERE
-char*loginargv[]={"/usr/sbin/cb3rob-ax25-bbs-login",sourcecall,destcall,"CB3ROB-MUTINY-AX25-BBS",NULL};
-char*loginenvp[]={"TERM=dumb",NULL};
-execve("/usr/sbin/cb3rob-ax25-bbs-login",&loginargv[0],&loginenvp[0]);
-exit(EXIT_SUCCESS);
-}else{
-//PARENT (DATA RELAY)
-if(fcntl(master,F_SETFL,fcntl(master,F_GETFL,0)&~O_NONBLOCK))exit(EXIT_FAILURE);
-FD_ZERO(&readfds);
-while(waitpid(ptychild,NULL,WNOHANG)!=ptychild){
-nfds=master;if(csock>master)nfds=csock;
-FD_SET(master,&readfds);
-FD_SET(csock,&readfds);
-tv.tv_sec=300;
-tv.tv_usec=0;
-//MAKE SURE WE CAN BOTH READ AND WRITE
-if(select(nfds+1,&readfds,NULL,NULL,&tv)>0){
-//BYTES FROM PROGRAM
-FD_ZERO(&writefds);
-FD_SET(csock,&writefds);
-tv.tv_sec=0;
-tv.tv_usec=100000;
-if(select(nfds+1,NULL,&writefds,NULL,&tv)>0){
-if(FD_ISSET(master,&readfds)&&FD_ISSET(csock,&writefds)){
-//STICK TO MTU SIZE - TBUF IS ONE LONGER FOR TRAILING ZERO ON STRINGS INTERNALLY
-bytes=read(master,&tbuf,sizeof(tbuf));
-if(bytes<1)termclient(csock,master,ptychild);
-if(bytes>0){
-printf("%s CLIENT %d READ %ld BYTES FROM LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
-//HAVE TERMIOS DO THIS
-//for(n=0;n<bytes;n++)if(tbuf[n]==0x0A)tbuf[n]=0x0D;
-if(sendclient(&tbuf,bytes)<1)termclient(csock,master,ptychild);
-};//RECEIVED BYTES FROM PROGRAM
-};//FD SET
-};//SELECT WRITE
-//BYTES TO PROGRAM
-FD_ZERO(&writefds);
-FD_SET(csock,&writefds);
-tv.tv_sec=0;
-tv.tv_usec=100000;
-FD_SET(master,&writefds);
-if(select(nfds+1,NULL,&writefds,NULL,&tv)>0){
-if(FD_ISSET(csock,&readfds)&&FD_ISSET(master,&writefds)){
-bytes=recv(csock,&tbuf,sizeof(tbuf),0);
-if(bytes<1)termclient(csock,master,ptychild);
-if(bytes>0){
-printf("%s CLIENT %d SENT %ld BYTES TO LOGIN %d\n",srcbtime(0),getpid(),bytes,ptychild);
-//HAVE TERMIOS DO THIS
-//for(n=0;n<bytes;n++)if(tbuf[n]==0x0D)tbuf[n]=0x0A;
-if(write(master,&tbuf,bytes)<1)termclient(csock,master,ptychild);
-};//SENT BYTES TO PROGRAM
-};//FD SET
-};//SELECT WRITE
-};//SELECT READ
-};//WHILE CHILD RUNNING
-ptychild=-1;
-};//PARENT
 
+logintime=time(NULL);
+//STRIP SSID
+memset(user,0,sizeof(user));
+for(n=0;(n<sizeof(user)-1)&&(sourcecall[n])&&(sourcecall[n]!='-');n++)user[n]=sourcecall[n];
+if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)&~O_NONBLOCK))dprintf(csock,"SYSTEM ERROR\r\r");
+//INIT USER
+inituser(user);
+printstatus();
+printwelcome();
+readfile("/ETC/WELCOME.TXT",BPNLCR);
+
+while(1){
+printprompt();
+currentcmd=getcommand();
+if(currentcmd==NULL)break;//BLOCKING READ FELL THROUGH AS PARENT CLOSED PTY (MOST LIKELY)
+if(!bcmp(currentcmd,"#BIN#",5)){cmdbput(currentcmd,user);continue;};//RELAY THE ENTIRE CMD LINE TO BPUT ROUTINE
+for(n=0;currentcmd[n]!=0;n++)if(currentcmd[n]==0x5C)currentcmd[n]=0x2F;//FETCH STRINGLENGTH AND TRANSLATE PATHS
+if(n>0)for(n--;(n>=0)&&(currentcmd[n]==0x20);n--)currentcmd[n]=0;//REMOVE TRAILING SPACE WORKING BACKWARDS
+//DIR
+if(!bcmp(currentcmd,"DIR",3))if((currentcmd[3]==0x20)||(currentcmd[3]==0)){cmddir((char*)currentcmd+3);continue;};
+if(!bcmp(currentcmd,"LS",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmddir((char*)currentcmd+2);continue;};
+if(!bcmp(currentcmd,"LIST",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmddir((char*)currentcmd+4);continue;};
+//CHANGE DIR
+if(!bcmp(currentcmd,"CHDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdchdir((char*)currentcmd+5);continue;};
+if(!bcmp(currentcmd,"CD",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdchdir((char*)currentcmd+2);continue;};
+//MAKE DIR
+if(!bcmp(currentcmd,"MKDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmdmkdir((char*)currentcmd+5);continue;};
+if(!bcmp(currentcmd,"MD",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdmkdir((char*)currentcmd+2);continue;};
+//ERASE
+if(!bcmp(currentcmd,"ERASE",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmderase((char*)currentcmd+5);continue;};
+if(!bcmp(currentcmd,"DEL",3))if((currentcmd[3]==0x20)||(currentcmd[3]==0)){cmderase((char*)currentcmd+3);continue;};
+if(!bcmp(currentcmd,"RMDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmderase((char*)currentcmd+5);continue;};
+if(!bcmp(currentcmd,"RM",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmderase((char*)currentcmd+2);continue;};
+//READ ASCII
+if(!bcmp(currentcmd,"READ",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdread((char*)currentcmd+4);continue;};
+//READ BIN
+if(!bcmp(currentcmd,"BGET",4))if((currentcmd[4]==0x20)||(currentcmd[4]==0)){cmdbget((char*)currentcmd+4);continue;};
+//TRANSFER TEST
+if(!strcmp(currentcmd,"TEST")){cmdtest(user);continue;};
+//HELP
+if(!strcmp(currentcmd,"HELP")){cmdhelp();continue;};
+//DISCONNECT
+if(!strcmp(currentcmd,"BYE")){cmdbye(user);continue;};
+if(!strcmp(currentcmd,"EXIT")){cmdbye(user);break;};
+if(!strcmp(currentcmd,"QUIT")){cmdbye(user);break;};
+if(!strcmp(currentcmd,"SALIR")){cmdbye(user);break;};
+if(!bcmp(currentcmd,"DISC",4)){cmdbye(user);break;};//DISCONNECT IS GOOD WITH ANY ABBREVIATION
+//FALLTHROUGH INVALID
+cmdinvalid();
+};//COMMAND LOOP
 printf("%s CLIENT %d WAIT FOR SOCKET %d CLOSE\n",srcbtime(0),getpid(),csock);
 //WAIT AT MOST 60 SECONDS FOR CLIENT TO CLOSE SOCKET OR CLOSE SOCKET OURSELVES.
 FD_ZERO(&readfds);
@@ -315,23 +849,19 @@ FD_SET(csock,&readfds);
 select(csock+1,&readfds,NULL,NULL,&tv);
 if(recv(csock,&tbuf,sizeof(tbuf),0)<1)break;
 };//WAITCLIENTCLOSE
-termclient(csock,master,ptychild);
+close(csock);
 exit(EXIT_SUCCESS);
 };//CLIENTCODE
 
 int main(int argc,char**argv){
 if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
-
 if(argc<2){printf("USAGE: %s <SERVICE-CALLSIGN-SSID> [INTERFACE-CALLSIGN]\n\nIF THE PROCESS IS TO LISTEN ON A (VIRTUAL) CALLSIGN OTHER THAN ONE OF AN INTERFACE SPECIFY THE INTERFACE AS WELL\n",argv[0]);exit(EXIT_FAILURE);};
-
 signal(SIGHUP,SIG_IGN);
 signal(SIGQUIT,SIG_IGN);
 signal(SIGCHLD,SIG_IGN);//PARENT DOESN'T CARE
-
 bsock=-1;setupsock(argv[1],argv[2]);
 //SEND FIRST BEACON IMMEDIATELY AFTER STARTUP
 sendbeacon(0);
-
 while(1){
 FD_ZERO(&readfds);//BSOCK CHANGES IF INTERFACE CHANGES
 FD_SET(bsock,&readfds);
