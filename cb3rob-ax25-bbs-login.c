@@ -596,8 +596,8 @@ if(remain<1){sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);ret
 if(parsefield==4){
 //printf("FILENAME IN: %s\r",buf);
 o=0;
-if(buf[o+c]!=0){
-for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]==0x5C)||(buf[c]==0x2F))o=c+1;
+for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]==0x5C)||(buf[c]==0x2F))o=c+1;//FAST FORWARD TO LAST SLASH
+if(buf[o]!=0){//IF FILENAME AFTER SLASH
 for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if(buf[c]==0x09)buf[c]=0x20;//HTAB TO SPACE
 for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<=0x20)||(buf[c]>0x7E))buf[c]='_';//JUST CHANGE ANY NON PRINTABLE CRAP TO '_'
 for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]>=0x61)&&(buf[c]<=0x7A))buf[c]&=0xDF;//ALL TO UPPER CASE
@@ -619,7 +619,7 @@ buf[n++]='B';
 buf[n++]='I';
 buf[n++]='N';
 buf[n]=0x00;
-snprintf(name,sizeof(name)-1,"%s-%s",username,buf+o);
+snprintf(name,sizeof(name)-1,"%s-%s",username,buf);
 //printf("FILENAME OUT: %s\r",name);
 //printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");return(-1);
 };//FILENAME ZERO RANDOMIZER
