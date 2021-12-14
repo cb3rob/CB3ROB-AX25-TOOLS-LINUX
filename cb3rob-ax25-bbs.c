@@ -267,7 +267,6 @@ rbytes=0;
 while((rbytes=read(ffd,&buf,sizeof(buf)))>1){
 if(asciimode&BPNLCR)for(n=0;n<rbytes;n++)if(buf[n]=='\n')buf[n]='\r';
 if((wbytes=write(csock,&buf,rbytes))<1)break;
-sync();
 total+=wbytes;
 };//WHILE READBLOCK
 close(ffd);
@@ -466,7 +465,7 @@ return(0);
 
 int cmdbye(char*username){
 dprintf(csock,"SEE YOU AGAIN SOON %s\r\r",username);
-sync();
+
 sleep(10);
 exit(EXIT_SUCCESS);
 };//CMDBYE
@@ -599,7 +598,7 @@ write(csock,&buf,strlen((char*)buf));
 
 //WAIT FOR PEER
 while(1){
-sync();
+
 tv.tv_sec=60;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
@@ -687,7 +686,6 @@ ssize_t remain;
 ssize_t okreturn;
 uint8_t buf[AX25_MTU];
 char name[256];
-//uint16_t crc;
 int parsefield;
 memset(&name,0,sizeof(name));
 parsefield=0;
@@ -699,18 +697,14 @@ n++;//SKIP FIELD DELIMITER ITSELF
 memset(&buf,0,sizeof(buf));
 //COPY FIELD TO BUF
 for(f=0;((n+f)<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd[n+f]!='#');f++)buf[f]=bincmd[n+f];
-//dprintf(csock,"FIELD: %d: [%s]\r",parsefield,buf);
-if(parsefield==0)if(strcmp((char*)buf,"BIN")){sync();sleep(1);write(csock,"#NO#\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
+if(parsefield==0)if(strcmp((char*)buf,"BIN")){write(csock,"#NO#\r",5);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
 if(parsefield==1){//FILE LENGTH
-for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<0x30)||(buf[c]>0x39)){sync();sleep(1);write(csock,"#NO#\r",5);sync();sleep(1);return(-1);};//NOT A DECIMAL NUMBER
+for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<0x30)||(buf[c]>0x39)){write(csock,"#NO#\r",5);return(-1);};//NOT A DECIMAL NUMBER
 remain=atoll((char*)buf);
 okreturn=remain;
-if(remain<1){sync();sleep(1);write(csock,"#NO#\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
-//dprintf(csock,"FILE SIZE: %ld\r",remain);
+if(remain<1){write(csock,"#NO#\r",5);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
 };//FILE LENGTH FIELD
-//IGNORE CRC AND FILE CREATION FOR NOW. FILE CREATION ISN'T 2038 BUG COMPLIANT ANYWAY AS IT'S A 32 BIT TIMESTAMP OF UNCLEAR ENDIANITY
 if(parsefield==4){
-//dprintf(csock,"FILENAME IN: %s\r",buf);
 o=0;
 for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]==0x5C)||(buf[c]==0x2F))o=c+1;//FAST FORWARD TO LAST SLASH
 if(buf[o]!=0){//IF FILENAME AFTER SLASH
@@ -718,7 +712,6 @@ for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if(buf[c]==0x09)buf[c]=0x20;//HTAB TO
 for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<=0x20)||(buf[c]>0x7E))buf[c]='_';//JUST CHANGE ANY NON PRINTABLE CRAP TO '_'
 for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]>=0x61)&&(buf[c]<=0x7A))buf[c]&=0xDF;//ALL TO UPPER CASE
 snprintf(name,sizeof(name)-1,"%s-%s",username,buf+o);
-//dprintf(csock,"FILENAME OUT: %s\r",name);
 };//ACTUAL FILENAME AFTER THE SLASH?
 };//FILENAME FIELD FOUND
 n=n+f;//FAST FORWARD N COUNTER TO NEXT DELIMITER
@@ -736,13 +729,11 @@ buf[n++]='I';
 buf[n++]='N';
 buf[n]=0x00;
 snprintf(name,sizeof(name)-1,"%s-%s",username,buf);
-//dprintf(csock,"FILENAME OUT: %s\r",name);
-//dprintf(csock,"ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");return(-1);
 };//FILENAME ZERO RANDOMIZER
 ffd=open(name,O_WRONLY|O_CREAT|O_EXCL,00640);
-if(ffd==-1){sync();sleep(1);write(csock,"#NO#\r",5);sync();sleep(1);dprintf(csock,"BPUT ABORTED: %s FILE CREATION ERROR - NO PERMISSION HERE OR FILE EXITS\r\r",name);return(-1);};
+if(ffd==-1){write(csock,"#NO#\r",5);dprintf(csock,"BPUT ABORTED: %s FILE CREATION ERROR - NO PERMISSION HERE OR FILE EXITS\r\r",name);return(-1);};
 //GIVE OK FOR TRANSFER
-sync();sleep(1);write(csock,"#OK#\r",5);sync();
+write(csock,"#OK#\r",5);
 while(remain>0){
 tv.tv_sec=10;
 tv.tv_usec=0;
@@ -752,13 +743,12 @@ if(select(csock+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(csock,&readfds)){
 memset(&buf,0,sizeof(buf));
 rbytes=read(csock,&buf,sizeof(buf));
 if(rbytes<1){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BPUT ABORTED: %s DATA RECEIVE ERROR\r\r",name);return(-1);};
-//CHECK DATA FOR ABORT
-for(n=0;(n<sizeof(buf)-8)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST # (ABORT IS SUPPOSED TO BE BETWEEN 2 \r's IN A PACKET OF IT'S OWN BUT WE'RE LESS PICKY)
-if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r\r",name);return(-1);};
-//WRITE
+if(!bcmp(buf,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r\r",name);return(-1);};
+if(bcmp(buf,"SP\-",4){
 wbytes=write(ffd,&buf,rbytes);
 if(wbytes<rbytes){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BPUT ABORTED: %s FILE WRITE ERROR\r\r",name);return(-1);};
 remain-=wbytes;
+};//IGNORE PRIVATE MESSAGES
 };//FDISSET FILE
 };//WHILE DATA LEFT TO SEND
 close(ffd);
