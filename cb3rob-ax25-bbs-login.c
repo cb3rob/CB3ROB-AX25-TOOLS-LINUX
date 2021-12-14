@@ -490,7 +490,7 @@ if(FD_ISSET(STDIN_FILENO,&readfds))
 //'STATION A SHOULD IGNORE ANY DATA NOT BEGINNING WITH #OK# OR #NO#' - AS WE ARE RUNNING ON A PTY WE CAN'T BE ABSOLUTELY SURE OF AX.25 FRAME LIMITS THOUGH.
 memset(&buf,0,sizeof(buf));
 if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
-for(n=0;(n<sizeof(buf)-7)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST #, ALLOW SOME PLAYROOM FOR EVENTUAL '\r' AT THE START (ABORT DURING SETUP) AND OTHER CREATIVE INTERPRETATIONS
+for(n=0;(n<sizeof(buf)-7)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST #, ALLOW -SOME- PLAYROOM FOR EVENTUAL '\r' AT THE START (ABORT DURING SETUP) AND OTHER CREATIVE INTERPRETATIONS
 if(!bcmp(&buf+n,"#NO#",4)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
 //GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
 if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
@@ -514,8 +514,14 @@ nfds=STDIN_FILENO;
 if(STDOUT_FILENO>nfds)nfds=STDOUT_FILENO;
 if(ffd>nfds)nfds=ffd;
 select(nfds+1,&readfds,&writefds,NULL,&tv);
-//HANDLE ABORT, IGNORE ANYTHING ELSE, AS PER SPECIFICATION
-if(FD_ISSET(STDIN_FILENO,&readfds))while(read(STDIN_FILENO,&buf,1)==1)if(buf[0]=='#')if(read(STDIN_FILENO,&buf+1,6)==6)if(!bcmp(&buf,"#ABORT#",7)){close(ffd);printf("BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
+//HANDLE ABORT -BEFORE SENDING DATA-, IGNORE ANYTHING ELSE THAT COMES IN, AS PER SPECIFICATION
+if(FD_ISSET(STDIN_FILENO,&readfds)){
+memset(&buf,0,sizeof(buf));
+if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
+for(n=0;(n<sizeof(buf)-7)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST # (ABORT IS SUPPOSED TO BE BETWEEN 2 \r's IN A PACKET OF IT'S OWN BUT WE'RE LESS PICKY)
+if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
+};//IF DATA
+};//FD_ISSET PTY
 //SEND DATA - AND YES WE MUST CHECK IF THE PTY IS READY TO TAKE IT OR THINGS GO REALLY BONKERS
 if(FD_ISSET(ffd,&readfds)&&FD_ISSET(STDOUT_FILENO,&writefds)){
 rbytes=read(ffd,&buf,sizeof(buf));
