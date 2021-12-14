@@ -549,9 +549,10 @@ if(name[0])printf("\rREAD: %ld BYTES\r\r",readfile(name,BPNLCR));else printf("ER
 };//IF PARAMETERS
 };//CMDCHDIR
 
-void cmdbput(char*bincmd,char*username){
+ssize_t cmdbput(char*bincmd,char*username){
 int n;
 int f;
+int c;
 int ffd;
 ssize_t rbytes;
 ssize_t wbytes;
@@ -570,12 +571,28 @@ memset(&buf,0,sizeof(buf));
 //COPY FIELD TO BUF
 for(f=0;((n+f)<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd[n+f]!='#');f++)buf[f]=bincmd[n+f];
 printf("FIELD: %d: [%s]\r",parsefield,buf);
+if(parsefield==0)if(strcmp(&buf,"BIN")){sync();sleep(1);write(STDOUT_FILENO,"#NO#PROTOCOL\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
+if(parsefield==1){//FILE LENGTH
+for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<0x30)||(buf[c]>0x39)){sync();sleep(1);write(STDOUT_FILENO,"#NO#PROTOCOL\r",5);sync();sleep(1);return(-1);};//NOT A DECIMAL NUMBER
+remain=atol(buf);
+if(remain<1){sync();sleep(1);write(STDOUT_FILENO,"#NO#EMPTYFILE\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
+printf("FILE SIZE: %d,remain\r");
+};//FILE LENGTH
+//IGNORE CRC AND FILE CREATION FOR NOW. FILE CREATION ISN'T 2038 BUG COMPLIANT ANYWAY AS IT'S A 32 BIT TIMESTAMP OF UNCLEAR ENDIANITY
+if(parsefield==4)printf("FILE NAME: %s\r",buf);
 n=n+f;//FAST FORWARD N COUNTER TO NEXT DELIMITER
 n--;//PUT N BACK WHERE WE FOUND IT SO WE DON'T SKIP SEGMENTS
 parsefield++;
 };//FOR FIELDCOPY
 };//FOR BYTE
-printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");
+printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");return(-1);
+
+//IF PARSEFIELD==5 BUF NOW CONTAINS FILENAME AS IF THERE WAS ONE (BIN WITHOUT AUTO PROTOCOL HAS NONE) THAT IS THE LAST FIELD
+//STRIP IT DOWN SO IT HAS NO PATH, IS UPPER CASE, COMPLIES TO OUR NAMING CONVENTIONS, AND TRY TO EXCL OPEN WRITE.
+//SOMEHOW FIGURE OUT A WAY NOT TO ATTACH IT TO THE FILESYSTEM LIKE WITH O_TMPFILE SO USERS CAN'T SEE OR USE A SPECIAL EXTENSION THEY CAN'T SEE UNTIL UPLOAD COMPLETED
+
+fclose(ffd);
+
 };//CMDBPUT
 
 int main(int argc,char**argv){
