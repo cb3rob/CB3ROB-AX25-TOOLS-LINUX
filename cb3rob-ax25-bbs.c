@@ -266,7 +266,7 @@ wbytes=0;
 rbytes=0;
 while((rbytes=read(ffd,&buf,sizeof(buf)))>1){
 if(asciimode&BPNLCR)for(n=0;n<rbytes;n++)if(buf[n]=='\n')buf[n]='\r';
-if((wbytes=send(csock,&buf,rbytes))<1,0)break;
+if((wbytes=send(csock,&buf,rbytes,0))<1)break;
 total+=wbytes;
 };//WHILE READBLOCK
 close(ffd);
@@ -292,7 +292,7 @@ char*getcommand(){
 static unsigned char cmd[128];
 int n;
 memset(&cmd,0,sizeof(cmd));
-if(recv(csock,(void*)&cmd,sizeof(cmd)-1)<1)return(NULL,0);
+if(recv(csock,(void*)&cmd,sizeof(cmd)-1,0)<1)return(NULL);
 for(n=0;(n<sizeof(cmd))&&(cmd[n]);n++){
 if((cmd[n]=='\r')||(cmd[n]=='\n')){cmd[n]=0;break;};
 if(cmd[n]==0x09){cmd[n]=0x20;continue;};//HTAB TO SPACE
