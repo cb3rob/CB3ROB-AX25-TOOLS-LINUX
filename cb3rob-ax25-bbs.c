@@ -744,7 +744,7 @@ memset(&buf,0,sizeof(buf));
 rbytes=read(csock,&buf,sizeof(buf));
 if(rbytes<1){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BPUT ABORTED: %s DATA RECEIVE ERROR\r\r",name);return(-1);};
 if(!bcmp(buf,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r\r",name);return(-1);};
-if(bcmp(buf,"SP\-",4){
+if(bcmp(buf,"SP\\-",4)){
 wbytes=write(ffd,&buf,rbytes);
 if(wbytes<rbytes){close(ffd);write(csock,"\r#ABORT#\r",9);dprintf(csock,"BPUT ABORTED: %s FILE WRITE ERROR\r\r",name);return(-1);};
 remain-=wbytes;
