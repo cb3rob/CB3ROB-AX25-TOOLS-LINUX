@@ -569,8 +569,8 @@ parsefield++;
 n++;//SKIP FIELD DELIMITER ITSELF
 memset(&buf,0,sizeof(buf));
 //COPY FIELD TO BUF
-for(f=0;(f+n<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd[n+f]!='#');f++)buf[n]=bincmd[n+f];
-printf("FIELD: %d: [%s]\n",parsefield,buf);
+for(f=0;((n+f)<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd[n+f]!='#');f++)buf[f]=bincmd[n+f];
+printf("FIELD: %d: [%s]\r",parsefield,buf);
 n=n+f;//FAST FORWARD N COUNTER TO NEXT DELIMITER
 };//FOR FIELDCOPY
 };//FOR BYTE
