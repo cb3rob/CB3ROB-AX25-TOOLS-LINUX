@@ -461,7 +461,7 @@ ssize_t rbytes;
 ssize_t wbytes;
 ssize_t remain;
 struct stat statbuf;
-uint8_t buf[128];
+uint8_t buf[256];
 if(name==NULL)return(-1);
 for(n=0;name[n]==0x20;n++);
 name=name+n;//STRIP LEADING SPACE
@@ -549,14 +549,33 @@ if(name[0])printf("\rREAD: %ld BYTES\r\r",readfile(name,BPNLCR));else printf("ER
 };//IF PARAMETERS
 };//CMDCHDIR
 
-void cmdautobin(char*bincmd,char*username){
-sync();
-sleep(1);
-printf("#NO#\r");
-sync();
-sleep(1);
+void cmdbput(char*bincmd,char*username){
+int n;
+int f;
+int ffd;
+ssize_t rbytes;
+ssize_t wbytes;
+ssize_t remain;
+struct stat statbuf;
+uint8_t buf[256];
+uint16_t crc;
+size_t rsize;
+int parsefield;
+parsefield=0;
+sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);//DENY UPLOAD
+for(n=0;(bincmd[n]!=0)&&(bincmd[n]!='\r');n++){
+if(bincmd[n]=='#'){
+parsefield++;
+n++;//SKIP FIELD DELIMITER ITSELF
+memset(&buf,0,sizeof(buf));
+//COPY FIELD TO BUF
+for(f=0;(f+n<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd[n+f]!='#');f++)buf[n]=bincmd[n+f];
+printf("FIELD: %d: [%s]\n",parsefield,buf);
+n=n+f;//FAST FORWARD N COUNTER TO NEXT DELIMITER
+};//FOR FIELDCOPY
+};//FOR BYTE
 printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");
-};//CMDAUTOBIN
+};//CMDBPUT
 
 int main(int argc,char**argv){
 int n;
@@ -595,7 +614,7 @@ while(1){//IF THE PARENT DIES WE DIE BY SIGNAL ANYWAY
 printprompt();
 currentcmd=getcommand();
 if(currentcmd==NULL)break;//BLOCKING READ FELL THROUGH AS PARENT CLOSED PTY (MOST LIKELY)
-if(!bcmp(currentcmd,"#BIN#",5)){cmdautobin(currentcmd,user);continue;};//RELAY THE ENTIRE CMD LINE TO THE AUTOBIN PROGRAM
+if(!bcmp(currentcmd,"#BIN#",5)){cmdbput(currentcmd,user);continue;};//RELAY THE ENTIRE CMD LINE TO THE AUTOBIN PROGRAM
 for(n=0;currentcmd[n]!=0;n++)if(currentcmd[n]==0x5C)currentcmd[n]=0x2F;//FETCH STRINGLENGTH AND TRANSLATE PATHS
 if(n>0)for(n--;(n>=0)&&(currentcmd[n]==0x20);n--)currentcmd[n]=0;//REMOVE TRAILING SPACE WORKING BACKWARDS
 //DIR
