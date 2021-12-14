@@ -475,16 +475,18 @@ dprintf(csock,"INVALID COMMAND - TRY HELP\r\r");
 };//CMDINVALID
 
 void cmdhelp(){
-dprintf(csock,"DIR   [PATH]  - LISTS FILES\r");
-dprintf(csock,"CD    [PATH]  - CHANGES DIRECTORY\r");
-dprintf(csock,"MD    <PATH>  - CREATES DIRECTORY\r");
-dprintf(csock,"RM    <PATH>  - REMOVES FILE OR EMPTY DIRECTORY\r");
-dprintf(csock,"READ  <PATH>  - READS TEXT FILE\r");
-dprintf(csock,"BGET  <PATH>  - DOWNLOAD FILE USING THE #BIN# PROTOCOL\r");
-dprintf(csock,"EXIT          - TERMINATES SESSION\r");
-dprintf(csock,"\rPATHNAMES ARE 8.3 FORMAT [ A-Z 0-9 ]\r\r");
-//dprintf(csock,"AUTOBIN UPLOADS CAN BE STARTED WHILE ON THE PROMPT\r");
-//prrint("UPLOADS TO YOUR HOMEDIR OR /FILES OR /ANARCHY ONLY\r");
+char *helptext=\
+"DIR   [PATH]  - LISTS FILES\r"
+"CD    [PATH]  - CHANGES DIRECTORY\r"
+"MD    <PATH>  - CREATES DIRECTORY\r"
+"RM    <PATH>  - REMOVES FILE OR EMPTY DIRECTORY\r"
+"READ  <PATH>  - READS TEXT FILE\r"
+"BGET  <PATH>  - DOWNLOAD FILE USING THE #BIN# PROTOCOL\r"
+"EXIT          - TERMINATES SESSION\r"
+"\rPATHNAMES ARE 8.3 FORMAT [ A-Z 0-9 ]\r\r"
+"AUTOBIN UPLOADS CAN BE STARTED WHILE ON THE PROMPT\r"
+"UPLOADS TO YOUR HOMEDIR OR /FILES OR /ANARCHY ONLY\r";
+sendclient(helptext,0);
 };//CMDHELP
 
 int cmddir(char*name){
