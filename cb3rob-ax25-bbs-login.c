@@ -576,7 +576,7 @@ if(parsefield==1){//FILE LENGTH
 for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<0x30)||(buf[c]>0x39)){sync();sleep(1);write(STDOUT_FILENO,"#NO#PROTOCOL\r",5);sync();sleep(1);return(-1);};//NOT A DECIMAL NUMBER
 remain=atol(buf);
 if(remain<1){sync();sleep(1);write(STDOUT_FILENO,"#NO#EMPTYFILE\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
-printf("FILE SIZE: %d,remain\r");
+printf("FILE SIZE: %d\r",remain");
 };//FILE LENGTH
 //IGNORE CRC AND FILE CREATION FOR NOW. FILE CREATION ISN'T 2038 BUG COMPLIANT ANYWAY AS IT'S A 32 BIT TIMESTAMP OF UNCLEAR ENDIANITY
 if(parsefield==4)printf("FILE NAME: %s\r",buf);
