@@ -563,14 +563,15 @@ size_t rsize;
 int parsefield;
 parsefield=0;
 sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);//DENY UPLOAD
-for(n=0;(bincmd[n]!=0)&&(bincmd[n]!='\r')&&(bincmd[n]!='#');n++){
-//if(bincmd[n]=='#'){
+for(n=0;(bincmd[n]!=0)&&(bincmd[n]!='\r');n++){
+if(bincmd[n]=='#'){
 n++;//SKIP FIELD DELIMITER ITSELF
 memset(&buf,0,sizeof(buf));
 //COPY FIELD TO BUF
-for(f=0;((n+f)<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd[n+f]!='#');f++)buf[f]=bincmd[n+f];
+for(f=0;((n+f)<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd([n+f]!='#');f++)buf[f]=bincmd[n+f];
 printf("FIELD: %d: [%s]\r",parsefield,buf);
 n=n+f;//FAST FORWARD N COUNTER TO NEXT DELIMITER
+n--;//PUT N BACK WHERE WE FOUND IT SO WE DON'T SKIP SEGMENTS
 parsefield++;
 //};//FOR FIELDCOPY
 };//FOR BYTE
