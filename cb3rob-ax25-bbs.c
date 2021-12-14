@@ -259,7 +259,7 @@ ssize_t wbytes;
 ssize_t total;
 int n;
 if(filename==NULL)return(-1);
-ffd=open(filename,O_RDONLY,0);
+ffd=open(filename,O_RDONLY);
 if(ffd==-1)return(-1);
 total=0;
 wbytes=0;
