@@ -118,7 +118,7 @@ total+=wbytes;
 };//WHILE READBLOCK
 close(ffd);
 //CLEAR MEMORY
-memset(buf,0,sizeof(buf));
+memset(&buf,0,sizeof(buf));
 if(wbytes<1)return(-1);
 return(total);
 };//READFILE
@@ -490,11 +490,11 @@ if(FD_ISSET(STDIN_FILENO,&readfds))
 //'STATION A SHOULD IGNORE ANY DATA NOT BEGINNING WITH #OK# OR #NO#' - AS WE ARE RUNNING ON A PTY WE CAN'T BE ABSOLUTELY SURE OF AX.25 FRAME LIMITS THOUGH.
 memset(&buf,0,sizeof(buf));
 if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
-for(n=0;(n<sizeof(buf)-7)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST #, ALLOW -SOME- PLAYROOM FOR EVENTUAL '\r' AT THE START (ABORT DURING SETUP) AND OTHER CREATIVE INTERPRETATIONS
-if(!bcmp(&buf+n,"#NO#",4)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
+for(n=0;(n<sizeof(buf)-8)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST #, ALLOW -SOME- PLAYROOM FOR EVENTUAL '\r' AT THE START (ABORT DURING SETUP) AND OTHER CREATIVE INTERPRETATIONS
+if(!bcmp(buf+n,"#NO#",4)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
 //GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
-if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
-if(!bcmp(&buf+n,"#OK#",4))break;
+if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
+if(!bcmp(buf+n,"#OK#",4))break;
 };//HANDLE OK OR NOT OK
 };//WHILE FETCH DATA
 //PEER HAS TO ACCEPT WITHIN 1 MINUTE - ALSO AT LEAST TRY TO FORCE THE PTY TO SEND THE ABORT IN IT'S VERY OWN PACKET AS PER DOCUMENTATION...
@@ -519,7 +519,7 @@ if(FD_ISSET(STDIN_FILENO,&readfds)){
 memset(&buf,0,sizeof(buf));
 if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
 for(n=0;(n<sizeof(buf)-7)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST # (ABORT IS SUPPOSED TO BE BETWEEN 2 \r's IN A PACKET OF IT'S OWN BUT WE'RE LESS PICKY)
-if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
+if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);printf("BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
 };//IF DATA
 };//FD_ISSET PTY
 //SEND DATA - AND YES WE MUST CHECK IF THE PTY IS READY TO TAKE IT OR THINGS GO REALLY BONKERS
@@ -550,91 +550,108 @@ if(name[0])printf("\rREAD: %ld BYTES\r\r",readfile(name,BPNLCR));else printf("ER
 };//CMDCHDIR
 
 ssize_t cmdbput(char*bincmd,char*username){
-int n;
-int f;
-int c;
-int filenameoffset;
+ssize_t n;
+ssize_t f;
+ssize_t c;
+ssize_t o;
 int ffd;
 ssize_t rbytes;
 ssize_t wbytes;
 ssize_t remain;
+ssize_t okreturn;
 struct stat statbuf;
 uint8_t buf[256];
-uint8_t filename[256];
+uint8_t name[256];
 uint16_t crc;
 int parsefield;
-memset(&filename,0,sizeof(filename));
+memset(&name,0,sizeof(name));
 parsefield=0;
-sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);//DENY UPLOAD
+if((bincmd==NULL)||(username==NULL))return(-1);
+//sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);//DENY UPLOAD
 for(n=0;(bincmd[n]!=0)&&(bincmd[n]!='\r');n++){
 if(bincmd[n]=='#'){
 n++;//SKIP FIELD DELIMITER ITSELF
 memset(&buf,0,sizeof(buf));
 //COPY FIELD TO BUF
 for(f=0;((n+f)<sizeof(buf)-1)&&(bincmd[n+f]!=0)&&(bincmd[n+f]!='\r')&&(bincmd[n+f]!='#');f++)buf[f]=bincmd[n+f];
-printf("FIELD: %d: [%s]\r",parsefield,buf);
-if(parsefield==0)if(strcmp(&buf,"BIN")){sync();sleep(1);write(STDOUT_FILENO,"#NO#PROTOCOL\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
+//printf("FIELD: %d: [%s]\r",parsefield,buf);
+if(parsefield==0)if(strcmp((char*)buf,"BIN")){sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
 
 if(parsefield==1){//FILE LENGTH
-for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<0x30)||(buf[c]>0x39)){sync();sleep(1);write(STDOUT_FILENO,"#NO#PROTOCOL\r",5);sync();sleep(1);return(-1);};//NOT A DECIMAL NUMBER
-remain=atoll(buf);
-if(remain<1){sync();sleep(1);write(STDOUT_FILENO,"#NO#EMPTYFILE\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
-printf("FILE SIZE: %ld\r",remain);
-};//FILE LENGTH
+for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<0x30)||(buf[c]>0x39)){sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);return(-1);};//NOT A DECIMAL NUMBER
+remain=atoll((char*)buf);
+okreturn=remain;
+if(remain<1){sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);return(-1);};//NOT BIN PROTOCOL OR PARSE ERROR
+//printf("FILE SIZE: %ld\r",remain);
+};//FILE LENGTH FIELD
 //IGNORE CRC AND FILE CREATION FOR NOW. FILE CREATION ISN'T 2038 BUG COMPLIANT ANYWAY AS IT'S A 32 BIT TIMESTAMP OF UNCLEAR ENDIANITY
 if(parsefield==4){
-printf("FILE NAME IN: %s\r",buf);
-filenameoffset=0;
-for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if(buf[c]=='\')||(buf[c]=='/')filenameoffset=c;
-snprintf(filename,sizeof(filename)-1,"%s-%s",user,&filename+filenameoffset);
-printf("FILE NAME OUT: %s\r",filename);
-};
+//printf("FILENAME IN: %s\r",buf);
+o=0;
+if(buf[o+c]!=0){
+for(c=0;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]==0x5C)||(buf[c]==0x2F))o=c+1;
+for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if(buf[c]==0x09)buf[c]=0x20;//HTAB TO SPACE
+for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]<=0x20)||(buf[c]>0x7E))buf[c]='_';//JUST CHANGE ANY NON PRINTABLE CRAP TO '_'
+for(c=o;(c<sizeof(buf)-1)&&(buf[c]!=0);c++)if((buf[c]>=0x61)&&(buf[c]<=0x7A))buf[c]&=0xDF;//ALL TO UPPER CASE
+snprintf(name,sizeof(name)-1,"%s-%s",username,buf+o);
+//printf("FILENAME OUT: %s\r",name);
+};//ACTUAL FILENAME AFTER THE SLASH?
+};//FILENAME FIELD FOUND
 n=n+f;//FAST FORWARD N COUNTER TO NEXT DELIMITER
 n--;//PUT N BACK WHERE WE FOUND IT SO WE DON'T SKIP SEGMENTS
 parsefield++;
 };//FOR FIELDCOPY
 };//FOR BYTE
 
-printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");return(-1);
+//GENERATE RANDOM FILENAME IF NOT PRESENT OR INVALID
+memset(&buf,0,sizeof(buf));
+
+if(name[0]==0){
+for(n=0;n<8;n++)buf[n]=(rand()&0x0F)+0x41;
+buf[n++]=0x2D;
+buf[n++]='B';
+buf[n++]='I';
+buf[n++]='N';
+buf[n]=0x00;
+snprintf(name,sizeof(name)-1,"%s-%s",username,buf+o);
+//printf("FILENAME OUT: %s\r",name);
+//printf("ERROR: AUTOBIN NOT IMPLEMENTED YET\r\r");return(-1);
+};//FILENAME ZERO RANDOMIZER
+
+//MAKE SURE STDIN IS IN NON BLOCKING MODE
+if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)|O_NONBLOCK)){printf("SYSTEM ERROR\r\r");return(-1);};
+
+ffd=open(name,O_WRONLY|O_CREAT|O_EXCL|O_NONBLOCK,00640);
+if(ffd==-1){sync();sleep(1);write(STDOUT_FILENO,"#NO#\r",5);sync();sleep(1);printf("BPUT ABORTED: %s FILE CREATION ERROR - NO PERMISSION HERE OR FILE EXITS\r\r",name);return(-1);};
+
+//GIVE OK FOR TRANSFER
+sync();sleep(1);write(STDOUT_FILENO,"#OK#\r",5);sync();
 
 while(remain>0){
 tv.tv_sec=10;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
-FD_ZERO(&writefds);
-FD_SET(STDIN_FILENO,&readfds);
-FD_SET(STDOUT_FILENO,&writefds);
-FD_SET(ffd,&readfds);
-nfds=STDIN_FILENO;
-if(STDOUT_FILENO>nfds)nfds=STDOUT_FILENO;
-if(ffd>nfds)nfds=ffd;
-select(nfds+1,&readfds,&writefds,NULL,&tv);
-//HANDLE ABORT -BEFORE SENDING DATA-, IGNORE ANYTHING ELSE THAT COMES IN, AS PER SPECIFICATION
+FD_SET(STDIN_FILENO,&readfds);//ONLY INTERESTED IN STDIN. IF WRITE FAILS THE DISK IS PROBABLY BROKEN OR FULL
+select(STDIN_FILENO+1,&readfds,NULL,NULL,&tv);
 if(FD_ISSET(STDIN_FILENO,&readfds)){
 memset(&buf,0,sizeof(buf));
-if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
-for(n=0;(n<sizeof(buf)-7)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST # (ABORT IS SUPPOSED TO BE BETWEEN 2 \r's IN A PACKET OF IT'S OWN BUT WE'RE LESS PICKY)
-if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
-};//IF DATA
-};//FD_ISSET PTY
-//SEND DATA - AND YES WE MUST CHECK IF THE PTY IS READY TO TAKE IT OR THINGS GO REALLY BONKERS
-if(FD_ISSET(ffd,&readfds)&&FD_ISSET(STDOUT_FILENO,&writefds)){
-rbytes=read(ffd,&buf,sizeof(buf));
-if(rbytes<1){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BGET ABORTED: %s FILE READ ERROR\r\r",name);return(-1);};
-remain-=rbytes;
-wbytes=write(STDOUT_FILENO,&buf,rbytes);
-if(wbytes<rbytes){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BGET ABORTED: %s DATA TRANSMIT ERROR\r\r",name);return(-1);};
+rbytes=read(STDIN_FILENO,&buf,sizeof(buf));
+if(rbytes<1){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BPUT ABORTED: %s DATA RECEIVE ERROR\r\r",name);return(-1);};
+//CHECK DATA FOR ABORT
+for(n=0;(n<sizeof(buf)-8)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST # (ABORT IS SUPPOSED TO BE BETWEEN 2 \r's IN A PACKET OF IT'S OWN BUT WE'RE LESS PICKY)
+if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);printf("BPUT: %s ABORTED BY PEER\r\r",name);return(-1);};
+//WRITE
+wbytes=write(ffd,&buf,rbytes);
+if(wbytes<rbytes){close(ffd);sync();sleep(1);write(STDOUT_FILENO,"\r#ABORT#\r",9);sync();sleep(1);printf("BPUT ABORTED: %s FILE WRITE ERROR\r\r",name);return(-1);};
+remain-=wbytes;
 };//FDISSET FILE
-//BANGING THE CPU A BIT HERE IF THE PTY IS -NOT- READY TO ACCEPT MORE DATA (STDOUT -> PTY (BUFFER) -> MASTER -> SENDCLIENT() (BUFFER TO SLOW NETWORK) -> USUALLY SLLOOWWW CLIENT ALSO TRYING TO CRC IT)
-if(!FD_ISSET(STDOUT_FILENO,&writefds))sleep(1);//HAVE CPU DO OTHER THINGS. THIS WHOLE THING IS SINGLE TASKING ANYWAY.
 };//WHILE DATA LEFT TO SEND
 close(ffd);
 //STDIN BACK TO BLOCKING MODE TO BE SURE
 if(fcntl(STDIN_FILENO,F_SETFL,fcntl(STDIN_FILENO,F_GETFL,0)&~O_NONBLOCK)){printf("SYSTEM ERROR\r");};
-printf("\rBPUT FILE: %s BYTES: %ld\r\r",name,statbuf.st_size);
-return(wtotal);
+printf("\rBPUT FILE: %s BYTES: %ld\r\r",name,okreturn);
+return(okreturn);
 };//CMDBPUT
-
 
 int main(int argc,char**argv){
 int n;

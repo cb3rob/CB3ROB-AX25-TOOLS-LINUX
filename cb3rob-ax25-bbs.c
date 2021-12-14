@@ -128,7 +128,7 @@ tv.tv_usec=0;
 printf("%s CLIENT %d WAIT FOR SELECT\n",srcbtime(0),getpid());
 select(csock+1,NULL,&writefds,NULL,&tv);
 //FALL THROUGH IS SEND ANYWAY TO CHECK IF STILL CONNECTED
-thisblock=AX25_MTU;flags=MSG_DONTWAIT;if((total-sent)<=AX25_MTU){thisblock=(total-sent);flags|=MSG_EOR;};
+thisblock=AX25_MTU;flags=0;if((total-sent)<=AX25_MTU){thisblock=(total-sent);flags|=MSG_EOR;};
 printf("%s CLIENT %d SENDING: %ld SENT: %ld TOTAL: %ld\n",srcbtime(0),getpid(),thisblock,sent,total);
 //SEND TO DISCONNECTED PEER ACTUALLY WILL BLOCK FOREVER ANYWAY REGARDLESS OF NONBLOCK SETTINGS ON AX.25 SOCK_SEQPACKET BUT IT WILL TRIGGER SIGPIPE... HANDLE SIGPIPE OR DEFUNCT PROCESS!
 bytes=send(csock,(uint8_t*)data+sent,thisblock,flags);
@@ -224,7 +224,7 @@ sigact.sa_handler=calltermclient;
 sigaction(SIGTERM,&sigact,NULL);
 sigaction(SIGPIPE,&sigact,NULL);
 
-fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK);
+fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)&~O_NONBLOCK);
 printf("%s CLIENT %d CONNECTED\n",srcbtime(0),getpid());
 printf("%s CLIENT %d SOCKET: %d\n",srcbtime(0),getpid(),csock);
 memset(&tbuf,0,sizeof(tbuf));
@@ -252,20 +252,22 @@ execve("/usr/sbin/cb3rob-ax25-bbs-login",&loginargv[0],&loginenvp[0]);
 exit(EXIT_SUCCESS);
 }else{
 //PARENT (DATA RELAY)
-if(fcntl(master,F_SETFL,O_NONBLOCK)==-1)exit(EXIT_FAILURE);
+if(fcntl(master,F_SETFL,fcntl(master,F_GETFL,0)&~O_NONBLOCK))exit(EXIT_FAILURE);
 FD_ZERO(&readfds);
-FD_ZERO(&writefds);
 while(waitpid(ptychild,NULL,WNOHANG)!=ptychild){
-FD_SET(master,&readfds);
-FD_SET(master,&writefds);
-FD_SET(csock,&readfds);
-FD_SET(csock,&writefds);
-tv.tv_sec=600;
-tv.tv_usec=0;
 nfds=master;if(csock>master)nfds=csock;
-select(nfds+1,&readfds,&writefds,NULL,&tv);
-
+FD_SET(master,&readfds);
+FD_SET(csock,&readfds);
+tv.tv_sec=300;
+tv.tv_usec=0;
+//MAKE SURE WE CAN BOTH READ AND WRITE
+if(select(nfds+1,&readfds,NULL,NULL,&tv)>0){
 //BYTES FROM PROGRAM
+FD_ZERO(&writefds);
+FD_SET(csock,&writefds);
+tv.tv_sec=0;
+tv.tv_usec=100000;
+if(select(nfds+1,NULL,&writefds,NULL,&tv)>0){
 if(FD_ISSET(master,&readfds)&&FD_ISSET(csock,&writefds)){
 //STICK TO MTU SIZE - TBUF IS ONE LONGER FOR TRAILING ZERO ON STRINGS INTERNALLY
 bytes=read(master,&tbuf,sizeof(tbuf));
@@ -277,8 +279,14 @@ printf("%s CLIENT %d READ %ld BYTES FROM LOGIN %d\n",srcbtime(0),getpid(),bytes,
 if(sendclient(&tbuf,bytes)<1)termclient(csock,master,ptychild);
 };//RECEIVED BYTES FROM PROGRAM
 };//FD SET
-
+};//SELECT WRITE
 //BYTES TO PROGRAM
+FD_ZERO(&writefds);
+FD_SET(csock,&writefds);
+tv.tv_sec=0;
+tv.tv_usec=100000;
+FD_SET(master,&writefds);
+if(select(nfds+1,NULL,&writefds,NULL,&tv)>0){
 if(FD_ISSET(csock,&readfds)&&FD_ISSET(master,&writefds)){
 bytes=recv(csock,&tbuf,sizeof(tbuf),0);
 if(bytes<1)termclient(csock,master,ptychild);
@@ -289,9 +297,10 @@ printf("%s CLIENT %d SENT %ld BYTES TO LOGIN %d\n",srcbtime(0),getpid(),bytes,pt
 if(write(master,&tbuf,bytes)<1)termclient(csock,master,ptychild);
 };//SENT BYTES TO PROGRAM
 };//FD SET
+};//SELECT WRITE
+};//SELECT READ
 };//WHILE CHILD RUNNING
 ptychild=-1;
-
 };//PARENT
 
 printf("%s CLIENT %d WAIT FOR SOCKET %d CLOSE\n",srcbtime(0),getpid(),csock);
