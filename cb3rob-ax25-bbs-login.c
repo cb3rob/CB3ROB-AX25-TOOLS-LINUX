@@ -488,11 +488,13 @@ FD_SET(STDIN_FILENO,&readfds);
 select(STDIN_FILENO+1,&readfds,NULL,NULL,&tv);
 if(FD_ISSET(STDIN_FILENO,&readfds))
 //'STATION A SHOULD IGNORE ANY DATA NOT BEGINNING WITH #OK# OR #NO#' - AS WE ARE RUNNING ON A PTY WE CAN'T BE ABSOLUTELY SURE OF AX.25 FRAME LIMITS THOUGH.
+memset(&buf,0,sizeof(buf));
 if(read(STDIN_FILENO,&buf,sizeof(buf))>0){
-if(!bcmp(&buf,"#NO#",4)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
+for(n=0;(n<sizeof(buf)-7)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST #, ALLOW SOME PLAYROOM FOR EVENTUAL '\r' AT THE START (ABORT DURING SETUP) AND OTHER CREATIVE INTERPRETATIONS
+if(!bcmp(&buf+n,"#NO#",4)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
 //GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
-if(!bcmp(&buf,"#ABORT#",7)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
-if(!bcmp(&buf,"#OK#",4))break;
+if(!bcmp(&buf+n,"#ABORT#",7)){close(ffd);printf("BGET %s REFUSED BY PEER\r\r",name);return(-1);};
+if(!bcmp(&buf+n,"#OK#",4))break;
 };//HANDLE OK OR NOT OK
 };//WHILE FETCH DATA
 //PEER HAS TO ACCEPT WITHIN 1 MINUTE - ALSO AT LEAST TRY TO FORCE THE PTY TO SEND THE ABORT IN IT'S VERY OWN PACKET AS PER DOCUMENTATION...
