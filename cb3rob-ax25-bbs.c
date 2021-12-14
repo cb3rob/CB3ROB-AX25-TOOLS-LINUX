@@ -252,7 +252,7 @@ return(-1);//FALLTHROUGH INVALID
 };//CHKCALL
 
 ssize_t readfile(const char*filename,int asciimode){
-uint8_t buf[512];
+uint8_t buf[AX25_MTU];
 int ffd;
 ssize_t rbytes;
 ssize_t wbytes;
