@@ -148,34 +148,9 @@ active=select(rnfds+1,&readfds,NULL,NULL,&tv);
 printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),active);
 if(active>0){
 
-if(FD_ISSET(sock,&readfds)){
-//FIND FIRST FREE SLOT
-for(slot=0;(slot<MAXCLIENTS)&&(cl[slot].fd!=-1);slot++);
-//ACCEPT 1 CLIENT PER LOOP
-cl[slot].fd=accept(sock,NULL,0);//NON BLOCK
-//DON'T OVERFLOW MAXCLIENTS TABLE
-if(cl[slot].fd!=-1){
-//HAVE CLIENT
-if(slot<(MAXCLIENTS-1)){
-cl[slot].lastvalid=0;
-wipe(slot);
-//FORCE NONBLOCK
-fcntl(cl[slot].fd,F_SETFL,fcntl(cl[slot].fd,F_GETFL,0)|O_NONBLOCK);
-true=1;//DISABLE NAGLE
-setsockopt(cl[slot].fd,IPPROTO_TCP,TCP_NODELAY,(char*)&true,sizeof(int));
-FD_SET(cl[slot].fd,&readfds);
-if(nfds<(cl[slot].fd+1))nfds=cl[slot].fd+1;
-printf("%s ACCEPTED SOURCE %d INTO SLOT %lu\n",srcbtime(0),cl[slot].fd,slot);
-}else{
-printf("%s REJECTED SOURCE %d\n",srcbtime(0),cl[slot].fd);
-disconnect(slot);
-};//MAXCLIENTS CHECK
-};//HAVE CLIENT
-};//FDISSET SOCK
-
 for(slot=0;slot<MAXCLIENTS;slot++)if((cl[slot].fd!=-1)&&(FD_ISSET(cl[slot].fd,&readfds))){
 bytes=recv(cl[slot].fd,&tcppacket,sizeof(tcppacket),MSG_DONTWAIT);
-if(bytes==0){disconnect(slot);continue;};
+if(bytes<1){disconnect(slot);continue;};
 //PARSE TCP PACKET INTO SEPERATE KISS PACKETS
 if(bytes>0)for(n=0;n<bytes;n++){
 cl[slot].kiss.data[cl[slot].kiss.offset++]=tcppacket[n];
@@ -191,6 +166,32 @@ if(cl[slot].kiss.data[1]==0x00){printf("COMPLETE!\n");cl[slot].lastvalid=time(NU
 };//KISS LENGTH LARGER THAN 1
 };//FOREACH CHAR
 };//FOR CLIENTS LOOP
+
+//HANDLE NEW CLIENTS AFTER FORWARDING ANY TRAFFIC AS WE CAN'T ADD THEM TO THE SELECT ANYMORE ANYWAY
+if(FD_ISSET(sock,&readfds)){
+//FIND FIRST FREE SLOT
+for(slot=0;(slot<MAXCLIENTS)&&(cl[slot].fd!=-1);slot++);
+//ACCEPT 1 CLIENT PER LOOP
+cl[slot].fd=accept(sock,NULL,0);//NON BLOCK
+//DON'T OVERFLOW MAXCLIENTS TABLE
+if(cl[slot].fd!=-1){
+//HAVE CLIENT
+if(slot<(MAXCLIENTS-1)){
+cl[slot].lastvalid=0;
+wipe(slot);
+//FORCE NONBLOCK
+fcntl(cl[slot].fd,F_SETFL,fcntl(cl[slot].fd,F_GETFL,0)|O_NONBLOCK);
+true=1;//DISABLE NAGLE
+setsockopt(cl[slot].fd,IPPROTO_TCP,TCP_NODELAY,(char*)&true,sizeof(int));
+printf("%s ACCEPTED SOURCE %d INTO SLOT %lu\n",srcbtime(0),cl[slot].fd,slot);
+}else{
+printf("%s REJECTED SOURCE %d\n",srcbtime(0),cl[slot].fd);
+disconnect(slot);
+};//MAXCLIENTS CHECK
+};//HAVE CLIENT
+};//FDISSET SOCK
+
 };//IF SELECT > 0
 };//WHILE 1
 };//MAIN
+
