@@ -296,13 +296,12 @@ o=0;//NON-SPACE OFFSET
 memset(&cmd,0,sizeof(cmd));
 while(!cmd[o]){//UNTIL WE HAVE A STRING THAT ISN'T EMPTY
 if(recv(csock,(void*)&cmd,sizeof(cmd)-1,0)<1)return(NULL);//WILL JUST TRIGGER SIGPIPE ANYWAY IF IT FAILS
-for(o=0;(o<sizeof(cmd))&&(cmd[o]==0x20);n++);//FAST FORWARD LEADING SPACES
 for(n=o;(n<sizeof(cmd))&&(cmd[n]);n++){
 if((cmd[n]=='\r')||(cmd[n]=='\n')){cmd[n]=0;break;};
-if(cmd[n]==0x09){cmd[n]=0x20;continue;};//HTAB TO SPACE
 if((cmd[n]>=0x61)&&(cmd[n]<=0x7A)){cmd[n]&=0xDF;continue;};//ALL TO UPPER CASE
 if((cmd[n]<0x20)||cmd[n]>0x7E){cmd[n]=0x20;continue;};//NO WEIRD BINARY STUFF
 };//FOR
+for(o=0;(o<sizeof(cmd))&&(cmd[o]==0x20);o++);//FAST FORWARD ALL THE BINARY STUFF THAT ARE NOW SPACES
 };//WHILE EMPTY
 dprintf(csock,"\rCOMMAND: %s\r\r",cmd+o);//PRINT IT IN CASE USER HAS ECHO OFF IN HIS TERMINAL
 return((char*)&cmd+o);
@@ -676,7 +675,7 @@ for(n=0;name[n]==0x20;n++);
 name=name+n;//STRIP LEADING SPACE
 if(!name[0])return(-1);
 r=readfile(name,BPNLCR);
-if(r>=0)dprintf(csock,"\rREAD COMPLETED: %s BYTES: %ld\r",name,readfile(name,BPNLCR));else dprintf(csock,"ERROR OPENING: %s FILENAME?\r",name);
+if(r>=0)dprintf(csock,"\rREAD COMPLETED: %s BYTES: %ld\r",name,readfile(name,BPNLCR));else dprintf(csock,"ERROR OPENING: %s\r",name);
 return(r);
 };//CMDCHDIR
 
