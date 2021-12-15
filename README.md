@@ -1,9 +1,13 @@
-## CB3ROB-AX25-TOOLS-LINUX 2021-12-15T18:16:04Z (WEDNESDAY)
+## CB3ROB-AX25-TOOLS-LINUX 2021-12-15T19:37:33Z (WEDNESDAY)
 #
 ### cb3rob-kiss-tcp-attach.c
 links ax0 interface to KISS-TCP TNC, soundmodem (direwolf), or multiplexer server
+### cb3rob-ax25-sctp-attach.c
+links bpq0 interface to AX25-SCTP TNC, or multiplexer server
 ### cb3rob-kiss-tcp-multiplexer.c
 KISS-TCP server pretending to be a transparent radio network with KISS-TCP TNCs to clients
+### cb3rob-ax25-sctp-multiplexer.c
+AX25-over-SCTP server pretending to be a transparent radio network with AX25-SCTP TNCs to clients
 ### cb3rob-ax25-bridge.c
 AX.25 Bridge software to link all AX.25 interfaces on a linux box together and link them to one or more bpq ethernet segments transparently (or just no BPQ and link for example 2 KISS ports together)... you know... to simply have AX.25 terminal software on your laptop with wifi over bpq... and your tranceivers somewhere in the actual antenna masts. and so everything can just happily and directly talk to each other over ethernet, mainly. but it'll also bridge literally any other AX.25 interface type it finds. no digipeaters in the path. no nothing. as if it was all the same single network. kill -HUP to force re-read of interface list if new ones were added. removals are automatic.
 ### cb3rob-ax25-bbs.c

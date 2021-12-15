@@ -3,11 +3,11 @@
 //One CyberBunker Avenue
 //Republic CyberBunker
 
-//COMPILE WITH gcc -O3 -o cb3rob-axudp-attach cb3rob-axudp-attach.c
+//COMPILE WITH gcc -O3 -o cb3rob-ax25-sctp-attach cb3rob-ax25-sctp-attach.c
 
-//TO BRING UP AN AX.25 AXUDP INTERFACE (bpq0,bpq1,etc) TO AN AXUDP CONCENTRATOR SERVER:
+//TO BRING UP AN AX.25 AX25-OVER-SCTP INTERFACE (bpq0,bpq1,etc) TO AN AX25-OVER-SCTP CONCENTRATOR SERVER:
 
-// ./cb3rob-axudp-attach NOCALL-15 hu1nod.packetradio.at 93 &
+// ./cb3rob-ax25-sctp-attach NOCALL-15 208.109.9.123 8001 &
 
 #include<arpa/inet.h>
 #include<fcntl.h>
@@ -16,7 +16,7 @@
 #include<linux/if_arp.h>
 #include<linux/if_tun.h>
 #include<linux/if_slip.h>
-#include<linux/tcp.h>
+#include<linux/sctp.h>
 #include<netdb.h>
 #include<netinet/in.h>
 #include<stdio.h>
@@ -57,94 +57,8 @@ uint16_t len;
 unsigned char payload[2048];
 };
 
-uint16_t fcs16;
-
 struct bpqethhdr sockpacket;
 struct bpqethhdr tappacket;
-
-//SOME RIPPED STUFF TO GET THE CRC TO WORK. DON'T ASK.
-
-//crc.c Computations involving CRCs
-
-//The following code was taken from Appendix B of RFC 1171
-//(Point-to-Point Protocol)
-//The RFC credits the following sources for this implementation:
-//Perez, "Byte-wise CRC Calculations", IEEE Micro, June, 1983.
-//Morse, G., "Calculating CRC's by Bits and Bytes", Byte,
-//September 1986.
-//LeVan, J., "A Fast CRC", Byte, November 1987.
-//The HDLC polynomial: x**0 + x**5 + x**12 + x**16
-
-//FCS lookup table as calculated by the table generator in section 2.
-
-static uint16_t fcstab[256]={
-0x0000,0x1189,0x2312,0x329B,0x4624,0x57AD,0x6536,0x74BF,
-0x8C48,0x9DC1,0xAF5A,0xBED3,0xCA6C,0xDBE5,0xE97E,0xF8F7,
-0x1081,0x0108,0x3393,0x221A,0x56A5,0x472C,0x75B7,0x643E,
-0x9CC9,0x8D40,0xBFDB,0xAE52,0xDAED,0xCB64,0xF9FF,0xE876,
-0x2102,0x308B,0x0210,0x1399,0x6726,0x76AF,0x4434,0x55BD,
-0xAD4A,0xBCC3,0x8E58,0x9FD1,0xEB6E,0xFAE7,0xC87C,0xD9F5,
-0x3183,0x200A,0x1291,0x0318,0x77A7,0x662E,0x54B5,0x453C,
-0xBDCB,0xAC42,0x9ED9,0x8F50,0xFBEF,0xEA66,0xD8FD,0xC974,
-0x4204,0x538D,0x6116,0x709F,0x0420,0x15A9,0x2732,0x36BB,
-0xCE4C,0xDFC5,0xED5E,0xFCD7,0x8868,0x99E1,0xAB7A,0xBAF3,
-0x5285,0x430C,0x7197,0x601E,0x14A1,0x0528,0x37B3,0x263A,
-0xDECD,0xCF44,0xFDDF,0xEC56,0x98E9,0x8960,0xBBFB,0xAA72,
-0x6306,0x728F,0x4014,0x519D,0x2522,0x34AB,0x0630,0x17B9,
-0xEF4E,0xFEC7,0xCC5C,0xDDD5,0xA96A,0xB8E3,0x8A78,0x9BF1,
-0x7387,0x620E,0x5095,0x411C,0x35A3,0x242A,0x16B1,0x0738,
-0xFFCF,0xEE46,0xDCDD,0xCD54,0xB9EB,0xA862,0x9AF9,0x8B70,
-0x8408,0x9581,0xA71A,0xB693,0xC22C,0xD3A5,0xE13E,0xF0B7,
-0x0840,0x19C9,0x2B52,0x3ADB,0x4E64,0x5FED,0x6D76,0x7CFF,
-0x9489,0x8500,0xB79B,0xA612,0xD2AD,0xC324,0xF1BF,0xE036,
-0x18C1,0x0948,0x3BD3,0x2A5A,0x5EE5,0x4F6C,0x7DF7,0x6C7E,
-0xA50A,0xB483,0x8618,0x9791,0xE32E,0xF2A7,0xC03C,0xD1B5,
-0x2942,0x38CB,0x0A50,0x1BD9,0x6F66,0x7EEF,0x4C74,0x5DFD,
-0xB58B,0xA402,0x9699,0x8710,0xF3AF,0xE226,0xD0BD,0xC134,
-0x39C3,0x284A,0x1AD1,0x0B58,0x7FE7,0x6E6E,0x5CF5,0x4D7C,
-0xC60C,0xD785,0xE51E,0xF497,0x8028,0x91A1,0xA33A,0xB2B3,
-0x4A44,0x5BCD,0x6956,0x78DF,0x0C60,0x1DE9,0x2F72,0x3EFB,
-0xD68D,0xC704,0xF59F,0xE416,0x90A9,0x8120,0xB3BB,0xA232,
-0x5AC5,0x4B4C,0x79D7,0x685E,0x1CE1,0x0D68,0x3FF3,0x2E7A,
-0xE70E,0xF687,0xC41C,0xD595,0xA12A,0xB0A3,0x8238,0x93B1,
-0x6B46,0x7ACF,0x4854,0x59DD,0x2D62,0x3CEB,0x0E70,0x1FF9,
-0xF78F,0xE606,0xD49D,0xC514,0xB1AB,0xA022,0x92B9,0x8330,
-0x7BC7,0x6A4E,0x58D5,0x495C,0x3DE3,0x2C6A,0x1EF1,0x0F78};
-
-#define PPPINITFCS 0xFFFF //Initial FCS value
-#define PPPGOODFCS 0xF0B8 //Good final FCS value
-
-//Calculate a new fcs given the current fcs and the new data.
-
-uint16_t pppfcs(uint16_t fcs,unsigned char*cp,int len)
-{
-//ASSERT(sizeof (uint16_t) == 2);
-//ASSERT(((uint16_t) -1) > 0);
-while(len--)fcs=(fcs >> 8)^fcstab[(fcs^*cp++)&0xFF];
-return fcs;
-};
-
-//End code from Appendix B of RFC 1171
-
-//The following routines are simply convenience routines...
-//I'll merge them into the mainline code when suitably debugged
-
-//Return the computed CRC
-unsigned short int compute_crc(unsigned char*buf,int l){
-int fcs;
-fcs=PPPINITFCS;
-fcs=pppfcs(fcs,buf,l);
-fcs^=0xFFFF;
-return fcs;
-};
-
-//Return true if the CRC is correct
-int ok_crc(unsigned char*buf,int l){
-int fcs;
-fcs=PPPINITFCS;
-fcs=pppfcs(fcs,buf,l);
-return fcs==PPPGOODFCS;
-};
 
 char*srcbtime(time_t t){
 static char rcbt[22];
@@ -173,8 +87,8 @@ if(ascii[n+1]==0x31)if((ascii[n+2]>=0x30)&&(ascii[n+2]<=0x35))if(ascii[n+3]==0){
 return(-1);
 };//CALLTOBIN
 
-void udpconnect(char*host,char*port){
-//(RE-)CONNECT UDP
+void sctpconnect(char*host,char*port){
+//(RE-)CONNECT SCTP
 if(sock!=-1)close(sock);
 sock=-1;
 while(sock==-1){
@@ -184,20 +98,13 @@ if((he==NULL)||(he->h_addrtype!=AF_INET)||(he->h_length!=4)){printf("%s INVALID 
 saddr.sin_family=AF_INET;
 bcopy(he->h_addr_list[0],&saddr.sin_addr.s_addr,sizeof(saddr.sin_addr.s_addr));
 saddr.sin_port=htons(atoi(port));
-sock=socket(PF_INET,SOCK_DGRAM,IPPROTO_UDP);
+sock=socket(PF_INET,SOCK_STREAM,IPPROTO_SCTP);
 if(sock==-1){printf("%s SOCKET SETUP ERROR\n",srcbtime(0));sleep(1);continue;};
-baddr.sin_family=AF_INET;
-baddr.sin_addr.s_addr=INADDR_ANY;
-baddr.sin_port=htons(atoi(port));
-bind(sock,(struct sockaddr*)&baddr,sizeof(baddr));
-//ACTUALLY WE DON'T REALLY CARE IF BINDING TO THE SOURCE UDP PORT WORKED AS IT'S ONLY THERE TO CATER TO AXIPD'S NASTYNESS.
-//IF THE DESIRED SOURCEPORT=DESTINATION PORT IS TAKEN THE WORLD WILL JUST HAVE TO LIVE WITH IT BEING ANOTHER PORT AND ADAPT.
-//IT'LL BE ANOTHER PORT ONCE IT PASSES THROUGH MOST NAT ROUTERS ANYWAY. IT'S MORE OF A PREFERENCE REALLY THAN AN ACTUAL DEMAND.
 printf("%s CONNECTING: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));
 if(connect(sock,(struct sockaddr*)&saddr,sizeof(saddr))!=0){close(sock);sock=-1;printf("%s CONNECT ERROR: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));sleep(1);continue;};
 printf("%s CONNECTED: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));
 };//WHILE SOCK -1
-};//UDPCONNECT
+};//SCTPCONNECT
 
 int main(int argc,char**argv){
 int n;
@@ -209,11 +116,11 @@ FILE *bp;
 
 if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
 
-if(argc<4){printf("USAGE: %s <CALLSIGN[-SSID]> <AXUDP-SERVER> <PORT>\n",argv[0]);exit(EXIT_FAILURE);};
+if(argc<4){printf("USAGE: %s <CALLSIGN[-SSID]> <AX25-OVER-SCTP-SERVER> <PORT>\n",argv[0]);exit(EXIT_FAILURE);};
 
 if(calltobin(argv[1],&call)<1){printf("INVALID DEVICE CALLSIGN: %s\n",argv[1]);exit(EXIT_FAILURE);};
 
-sock=-1;udpconnect(argv[2],argv[3]);
+sock=-1;sctpconnect(argv[2],argv[3]);
 
 tap=open("/dev/net/tun",O_RDWR);
 if(tap==-1){printf("COULD NOT CREATE TAP DEVICE PAIR\n");exit(EXIT_FAILURE);};
@@ -286,29 +193,24 @@ tv.tv_sec=30;
 tv.tv_usec=0;
 printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),select(nfds+1,&readfds,&writefds,&exceptfds,&tv));
 
-//PACKETS THAT ARRIVE FROM AXUDP SERVER
+//PACKETS THAT ARRIVE FROM AX25-OVER-SCTP SERVER
 if(FD_ISSET(sock,&readfds)){
 bytes=recv(sock,&sockpacket.payload,sizeof(sockpacket.payload),MSG_DONTWAIT);
-if(bytes<=1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);udpconnect(argv[2],argv[3]);};
-if(bytes>=17){//2 7 BYTE ADDRESSES, 1 CONTROL BYTE, 2 BYTE FCS
-sockpacket.len=htons(bytes+3);//+5=INCLUDE FCS +3= STRIP THE FCS ON BPQETHER, ALSO BELOW
-fcs16=ntohs(compute_crc(sockpacket.payload,bytes-2));
-printf("%s INCOMING FCS: %04X MSB: %02X LSB: %02X %ld BYTES:",srcbtime(0),fcs16,sockpacket.payload[bytes-2],sockpacket.payload[bytes-1],bytes-2);for(n=0;n<bytes;n++)printf(" %02X",sockpacket.payload[n]);printf("\n");
-if((sockpacket.payload[(bytes-2)]!=(fcs16>>8))||(sockpacket.payload[(bytes-1)]!=(fcs16&0x00FF))){printf("%s INCOMING FCS FAILED\n",srcbtime(0));continue;};
-if(write(tap,&sockpacket,bytes+14)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
+if(bytes<=1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);sctpconnect(argv[2],argv[3]);};
+if(bytes>=15){//2 7 BYTE ADDRESSES, 1 CONTROL BYTE
+sockpacket.len=htons(bytes+5);
+printf("%s INCOMING PACKET: %ld BYTES:",srcbtime(0),bytes);for(n=0;n<bytes;n++)printf(" %02X",sockpacket.payload[n]);printf("\n");
+if(write(tap,&sockpacket,bytes+16)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
 };//BYTES>=17
 };//FDSET
 
-//PACKETS THAT GO TO AXUDP SERVER
+//PACKETS THAT GO TO AX25-OVER-SCTP SERVER
 if(FD_ISSET(tap,&readfds)){
-bytes=read(tap,&tappacket,sizeof(struct bpqethhdr)-2);//LEAVE 2 BYTES SPACE TO ADD THE FCS
-if(bytes>=(31)){//16 BYTE ETHBPQ HEADER + 15 BYTE AX25 PAYLOAD (NO FCS)
+bytes=read(tap,&tappacket,sizeof(struct bpqethhdr));
+if(bytes>=(31)){//16 BYTE ETHBPQ HEADER + 15 BYTE AX25 PAYLOAD
 if(tappacket.ptype==ntohs(ETH_P_BPQ)){
-fcs16=ntohs(compute_crc(tappacket.payload,bytes-16));
-tappacket.payload[bytes-16]=(fcs16>>8);//FCS MSB
-tappacket.payload[bytes-15]=(fcs16&0x00FF);//FCS LSB
-printf("%s OUTGOING FCS: %04X MSB: %02X LSB: %02X %ld BYTES:",srcbtime(0),fcs16,tappacket.payload[bytes-16],tappacket.payload[bytes-15],bytes-14);for(n=0;n<bytes-14;n++)printf(" %02X",tappacket.payload[n]);printf("\n");
-if(send(sock,&tappacket.payload,bytes-14,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);udpconnect(argv[2],argv[3]);};
+printf("%s OUTGOING PACKET: %ld BYTES:",srcbtime(0),bytes-16);for(n=0;n<bytes-16;n++)printf(" %02X",tappacket.payload[n]);printf("\n");
+if(send(sock,&tappacket.payload,bytes-16,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);sctpconnect(argv[2],argv[3]);};
 }else{printf("%s TAP DEVICE IGNORED NON BPQ PROTOCOL FAMILY: %04X PACKET\n",srcbtime(0),ntohs(tappacket.ptype));};//BPQ FRAME
 };//BYTES>0
 };//FDSET
