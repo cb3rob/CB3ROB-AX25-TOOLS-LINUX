@@ -506,6 +506,7 @@ if(name==NULL)name=getcwd(NULL,0);
 for(n=0;name[n]==0x20;n++);
 name=name+n;//STRIP LEADING SPACE
 if(!name[0])name=getcwd(NULL,0);
+chdir(name);//NEED THIS FOR FSTAT TO WORK
 total=0;
 files=0;
 dirs=0;
@@ -518,7 +519,7 @@ while((direntry=readdir(curdir))!=NULL){
 if((direntry->d_name[0]>=0x30&&direntry->d_name[0]<=0x39)||(direntry->d_name[0]>=0x41&&direntry->d_name[0]<=0x5A)||(direntry->d_name[0]>=0x61&&direntry->d_name[0]<=0x7A)){
 switch(direntry->d_type){
 case DT_REG:
-if(stat(direntry->d_name,&statbuf)==-1){dprintf(csock,"ERROR ON FILESTAT%s\r",direntry->d_name);continue;};
+if(stat(direntry->d_name,&statbuf)==-1){dprintf(csock,"ERROR ON READ STATUS: %s\r",direntry->d_name);continue;};
 if(statbuf.st_mtime<time(NULL)-180)fstatus=3;//STALLED (3 MINUTES INACTIVE)
 if(statbuf.st_mtime>=time(NULL)-180)fstatus=2;//STILL UPLOADING
 if(statbuf.st_mode&00444)fstatus=1;//READ PERMISSION IS SET ON COMPLETE UPLOADS
