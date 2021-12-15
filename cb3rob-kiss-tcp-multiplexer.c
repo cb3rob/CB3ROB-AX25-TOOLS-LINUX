@@ -86,7 +86,7 @@ uint64_t dest;
 ssize_t bytes;
 tv.tv_sec=0;
 tv.tv_usec=100000;
-if(select(nfds+1,NULL,&writefds,NULL,&tv)>0){
+if(select(wnfds+1,NULL,&writefds,NULL,&tv)>0){
 printf("%s SENT PACKET FROM: %d TO:",srcbtime(0),cl[slot].fd);
 //IF NOT READY TO SEND DATA TO RIGHT NOW WE SIMPLY SKIP THEM. CAN'T HAVE SLOW LINKS HOLD THE REST DOWN.
 for(dest=0;dest<MAXCLIENTS;dest++)if((cl[dest].fd!=-1)&&(cl[dest].fd!=cl[slot].fd)&&(FD_ISSET(cl[slot].fd,&writefds))){
@@ -140,8 +140,10 @@ FD_ZERO(&writefds);
 FD_SET(sock,&readfds);
 tv.tv_sec=30;
 tv.tv_usec=0;
-nfds=sock;
+nfds=0;
 for(slot=0;slot<MAXCLIENTS;slot++)if(cl[slot].fd!=-1){FD_SET(cl[slot].fd,&readfds);FD_SET(cl[slot].fd,&writefds);if(nfds<cl[slot].fd)nfds=cl[slot].fd;};
+wnfds=nfds;//FOR BROADCAST - WITHOUT SOCK
+if(sock>nfds)nfds=sock;
 
 printf("%s ENTERING SELECT\n",srcbtime(0));
 active=select(nfds+1,&readfds,NULL,NULL,&tv);
