@@ -34,9 +34,10 @@ int true;
 struct sockaddr_in saddr;
 
 int nfds;
+int wnfds;
+int rnfds;
 fd_set readfds;
 fd_set writefds;
-fd_set exceptfds;
 
 struct packet{
 size_t offset;
@@ -128,12 +129,9 @@ memset(&cl,0,sizeof(cl));
 for(slot=0;slot<MAXCLIENTS;slot++)cl[slot].fd=-1;
 FD_ZERO(&readfds);
 FD_ZERO(&writefds);
-FD_ZERO(&exceptfds);
 FD_SET(sock,&readfds);
-nfds=sock+1;
 
 while(1){
-
 //REBUILD SELECT DATA ON EACH LOOP
 FD_ZERO(&readfds);
 FD_ZERO(&writefds);
@@ -143,10 +141,10 @@ tv.tv_usec=0;
 nfds=0;
 for(slot=0;slot<MAXCLIENTS;slot++)if(cl[slot].fd!=-1){FD_SET(cl[slot].fd,&readfds);FD_SET(cl[slot].fd,&writefds);if(nfds<cl[slot].fd)nfds=cl[slot].fd;};
 wnfds=nfds;//FOR BROADCAST - WITHOUT SOCK
-if(sock>nfds)nfds=sock;
-
+rnfds=nfds;//FOR RECEIVE - WITH SOCK TO ACCEPT NEW CLIENTS
+if(sock>rnfds)rnfds=sock;
 printf("%s ENTERING SELECT\n",srcbtime(0));
-active=select(nfds+1,&readfds,NULL,NULL,&tv);
+active=select(rnfds+1,&readfds,NULL,NULL,&tv);
 printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),active);
 if(active>0){
 
