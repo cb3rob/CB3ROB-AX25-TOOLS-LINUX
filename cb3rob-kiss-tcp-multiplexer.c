@@ -76,18 +76,25 @@ void disconnect(uint64_t slot){
 printf("%s DISCONNECTED SLOT: %lu SOURCE: %d\n",srcbtime(0),slot,cl[slot].fd);
 close(cl[slot].fd);
 memset(&cl[slot],0,sizeof(struct clients));
+FD_CLR(cl[slot].fd,&readfds);
+FD_CLR(cl[slot].fd,&writefds);
 cl[slot].fd=-1;
 };//DISCONNECT
 
 void broadcast(uint64_t slot){
 uint64_t dest;
 ssize_t bytes;
+tv.tv_sec=0;
+tv.tv_usec=100000;
+if(select(nfds,NULL,&writefds,NULL,&tv)>0){
 printf("%s SENT PACKET FROM: %d TO:",srcbtime(0),cl[slot].fd);
-for(dest=0;dest<MAXCLIENTS;dest++)if((cl[dest].fd!=-1)&&(cl[dest].fd!=cl[slot].fd)){
+//IF NOT READY TO SEND DATA TO RIGHT NOW WE SIMPLY SKIP THEM. CAN'T HAVE SLOW LINKS HOLD THE REST DOWN.
+for(dest=0;dest<MAXCLIENTS;dest++)if((cl[dest].fd!=-1)&&(cl[dest].fd!=cl[slot].fd)&&(FD_ISSET(cl[slot].fd,&writefds))){
 bytes=send(cl[dest].fd,&cl[slot].kiss.data,cl[slot].kiss.offset,MSG_NOSIGNAL);
 printf(" %d",cl[dest].fd);
 if(bytes<1)disconnect(dest);
 };//FOREACH CLIENT
+};//ANYONE AT ALL READY TO RECEIVE?
 printf("\n");
 };//BROADCAST
 
@@ -133,7 +140,7 @@ tv.tv_usec=0;
 FD_ZERO(&readfds);
 FD_SET(sock,&readfds);
 nfds=sock;
-for(slot=0;slot<MAXCLIENTS;slot++)if(cl[slot].fd!=-1){FD_SET(cl[slot].fd,&readfds);if(nfds<cl[slot].fd)nfds=cl[slot].fd;};
+for(slot=0;slot<MAXCLIENTS;slot++)if(cl[slot].fd!=-1){FD_SET(cl[slot].fd,&readfds);FD_SET(cl[slot].fd,&writefds);if(nfds<cl[slot].fd)nfds=cl[slot].fd;};
 printf("%s ENTERING SELECT\n",srcbtime(0));
 active=select(nfds+1,&readfds,NULL,NULL,&tv);
 printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),active);
