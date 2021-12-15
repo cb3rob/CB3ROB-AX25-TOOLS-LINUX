@@ -507,8 +507,7 @@ dirs=0;
 curdir=opendir(name);
 if(curdir==NULL){dprintf(csock,"ERROR OPENING DIRECTORY: %s\r",name);return(-1);};//ERROR
 dprintf(csock,"DIRECTORY OF %s\r\r",name);
-dprintf(csock,"./\r");
-dprintf(csock,"../\r");
+dprintf(csock,"./\r..\r");
 while((direntry=readdir(curdir))!=NULL){
 if((direntry->d_name[0]>=0x30&&direntry->d_name[0]<=0x39)||(direntry->d_name[0]>=0x41&&direntry->d_name[0]<=0x5A)||(direntry->d_name[0]>=0x61&&direntry->d_name[0]<=0x7A)){
 switch(direntry->d_type){
