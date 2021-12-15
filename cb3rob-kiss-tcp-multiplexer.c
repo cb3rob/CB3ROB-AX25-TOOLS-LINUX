@@ -135,16 +135,20 @@ nfds=sock+1;
 while(1){
 
 //REBUILD SELECT DATA ON EACH LOOP
+FD_ZERO(&readfds);
+FD_ZERO(&writefds);
+FD_SET(sock,&readfds);
 tv.tv_sec=30;
 tv.tv_usec=0;
-FD_ZERO(&readfds);
-FD_SET(sock,&readfds);
 nfds=sock;
 for(slot=0;slot<MAXCLIENTS;slot++)if(cl[slot].fd!=-1){FD_SET(cl[slot].fd,&readfds);FD_SET(cl[slot].fd,&writefds);if(nfds<cl[slot].fd)nfds=cl[slot].fd;};
+
 printf("%s ENTERING SELECT\n",srcbtime(0));
 active=select(nfds+1,&readfds,NULL,NULL,&tv);
 printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),active);
+if(active>0){
 
+if(FD_ISSET(sock,&readfds)){
 //FIND FIRST FREE SLOT
 for(slot=0;(slot<MAXCLIENTS)&&(cl[slot].fd!=-1);slot++);
 //ACCEPT 1 CLIENT PER LOOP
@@ -167,6 +171,7 @@ printf("%s REJECTED SOURCE %d\n",srcbtime(0),cl[slot].fd);
 disconnect(slot);
 };//MAXCLIENTS CHECK
 };//HAVE CLIENT
+};//FDISSET SOCK
 
 for(slot=0;slot<MAXCLIENTS;slot++)if((cl[slot].fd!=-1)&&(FD_ISSET(cl[slot].fd,&readfds))){
 bytes=recv(cl[slot].fd,&tcppacket,sizeof(tcppacket),MSG_DONTWAIT);
@@ -186,5 +191,6 @@ if(cl[slot].kiss.data[1]==0x00){printf("COMPLETE!\n");cl[slot].lastvalid=time(NU
 };//KISS LENGTH LARGER THAN 1
 };//FOREACH CHAR
 };//FOR CLIENTS LOOP
+};//IF SELECT > 0
 };//WHILE 1
 };//MAIN
