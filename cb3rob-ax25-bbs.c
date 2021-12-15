@@ -495,7 +495,7 @@ sendclient(helptext,0);
 
 int cmddir(char*name){
 DIR*curdir;
-char *stattext[]={"COMPLETE","UPLOADING","STALLED"};
+char *stattext[]={"UNKNOWN","COMPLETE","UPLOADING","STALLED"};
 int fstatus;
 struct dirent*direntry;
 struct stat statbuf;
@@ -510,6 +510,7 @@ if(!name[0])name=getcwd(NULL,0);
 total=0;
 files=0;
 dirs=0;
+fstatus=0;
 curdir=opendir(name);
 if(curdir==NULL){dprintf(csock,"ERROR OPENING DIRECTORY: %s\r",name);return(-1);};//ERROR
 dprintf(csock,"DIRECTORY OF %s\r\r",name);
@@ -519,9 +520,9 @@ if((direntry->d_name[0]>=0x30&&direntry->d_name[0]<=0x39)||(direntry->d_name[0]>
 switch(direntry->d_type){
 case DT_REG:
 if(stat(direntry->d_name,&statbuf)==-1){dprintf(csock,"ERROR ON FILESTAT%s\r",direntry->d_name);continue;};
-if(statbuf.st_mtime<time(NULL)-180)fstatus=2;//STALLED (3 MINUTES INACTIVE)
-if(statbuf.st_mtime>=time(NULL)-180)fstatus=1;//STILL UPLOADING
-if(statbuf.st_mode&00444)fstatus=0;//READ PERMISSION IS SET ON COMPLETE UPLOADS
+if(statbuf.st_mtime<time(NULL)-180)fstatus=3;//STALLED (3 MINUTES INACTIVE)
+if(statbuf.st_mtime>=time(NULL)-180)fstatus=2;//STILL UPLOADING
+if(statbuf.st_mode&00444)fstatus=1;//READ PERMISSION IS SET ON COMPLETE UPLOADS
 if(statbuf.st_size>0)dprintf(csock,"%-27s %10lu (%s)\r",direntry->d_name,statbuf.st_size,stattext[fstatus]);//DON'T SHOW EMPTY FILES RESERVED DURING UPLOAD
 total+=statbuf.st_size;
 files++;
