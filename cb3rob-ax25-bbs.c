@@ -285,7 +285,7 @@ dprintf(csock,"=====================\rWelcome to MuTiNy BBS\r===================
 };//PRINTBANNER
 
 void printprompt(){
-dprintf(csock,"[ %s @ %s : %s ]> ",user,destcall,getcwd(NULL,0));
+dprintf(csock,"\r[ %s @ %s : %s ]> ",user,destcall,getcwd(NULL,0));
 };//PRINTPROMPT
 
 char*getcommand(){
@@ -464,14 +464,14 @@ return(0);
 };//INITUSER;
 
 int cmdbye(char*username){
-dprintf(csock,"SEE YOU AGAIN SOON %s\r\r",username);
+dprintf(csock,"SEE YOU AGAIN SOON %s\r",username);
 
 sleep(10);
 exit(EXIT_SUCCESS);
 };//CMDBYE
 
 void cmdinvalid(){
-dprintf(csock,"INVALID COMMAND - TRY HELP\r\r");
+dprintf(csock,"INVALID COMMAND - TRY HELP\r");
 };//CMDINVALID
 
 void cmdhelp(){
@@ -505,7 +505,7 @@ total=0;
 files=0;
 dirs=0;
 curdir=opendir(name);
-if(curdir==NULL){dprintf(csock,"ERROR OPENING DIRECTORY: %s\r\r",name);return(-1);};//ERROR
+if(curdir==NULL){dprintf(csock,"ERROR OPENING DIRECTORY: %s\r",name);return(-1);};//ERROR
 dprintf(csock,"DIRECTORY OF %s\r\r",name);
 dprintf(csock,"./\r");
 dprintf(csock,"../\r");
@@ -528,7 +528,7 @@ continue;
 };//VALID FILENAME
 };//WHILE DIRENTRY
 if(closedir(curdir)==-1)dprintf(csock,"ERROR CLOSING DIRECTORY\r");//ERROR;
-dprintf(csock,"\rTOTAL: %lu BYTES IN: %lu FILES AND %lu DIRECTORIES\r\r",total,files,dirs);
+dprintf(csock,"\rTOTAL: %lu BYTES IN: %lu FILES AND %lu DIRECTORIES\r",total,files,dirs);
 return(0);
 };//CMDDIR
 
@@ -541,7 +541,7 @@ if(name[0]){//JUST SHOW PWD
 if(chdir(name))dprintf(csock,"CHDIR TO %s FAILED\r",name);
 };//IF PARAMETERS OTHER THAN SPACE
 };//IF PARAMETERS
-dprintf(csock,"CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
+dprintf(csock,"CURRENT DIRECTORY: %s\r",getcwd(NULL,0));
 };//CMDCHDIR
 
 void cmdmkdir(char*name){
@@ -552,7 +552,7 @@ name=name+n;//STRIP LEADING SPACE
 if(chkpath(name)==-1)dprintf(csock,"INVALID ABSOLUTE 8.3 FORMAT [A-Z 0-9] PATH: %s\r",name);
 else if(mkdir(name,00750))dprintf(csock,"CREATE DIRECTORY %s FAILED\r",name);
 else chdir(name);//WE CD INTO IT DIRECTLY
-dprintf(csock,"CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
+dprintf(csock,"CURRENT DIRECTORY: %s\r",getcwd(NULL,0));
 };//IF PARAMETERS
 };//CMDMKDIR
 
@@ -563,7 +563,7 @@ for(n=0;name[n]==0x20;n++);
 name=name+n;//STRIP LEADING SPACE
 if(chkpath(name)==-1)dprintf(csock,"INVALID ABSOLUTE 8.3 FORMAT [A-Z 0-9] PATH: %s\r",name);
 else if(remove(name))dprintf(csock,"ERASE %s FAILED\r",name);
-dprintf(csock,"CURRENT DIRECTORY: %s\r\r",getcwd(NULL,0));
+dprintf(csock,"CURRENT DIRECTORY: %s\r",getcwd(NULL,0));
 };//IF PARAMETERS
 };//CMDERASE
 
@@ -585,15 +585,15 @@ for(n=0;name[n]==0x20;n++);
 name=name+n;//STRIP LEADING SPACE
 if(!name[0])return(-1);
 //FLUSH STDIN
-if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK)){dprintf(csock,"SYSTEM ERROR\r\r");return(-1);};
+if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)|O_NONBLOCK)){dprintf(csock,"SYSTEM ERROR\r");return(-1);};
 while(recv(csock,&buf,sizeof(buf),0)>0);//FLUSH STDIN TO MAKE SURE PEERS #OK# IS AT THE START OF RECEPTION
-if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)&~O_NONBLOCK)){dprintf(csock,"SYSTEM ERROR\r\r");return(-1);};
+if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)&~O_NONBLOCK)){dprintf(csock,"SYSTEM ERROR\r");return(-1);};
 //OPEN FILE
 ffd=open(name,O_RDONLY,0);
-if(ffd==-1){dprintf(csock,"ERROR OPENING: %s\r\r",name);return(-1);};
+if(ffd==-1){dprintf(csock,"ERROR OPENING: %s\r",name);return(-1);};
 //FILE IS NOW OPEN
-if(fstat(ffd,&statbuf)==-1){close(ffd);dprintf(csock,"SYSTEM ERROR\r\r");return(-1);};
-if((!(statbuf.st_mode&S_IFMT&S_IFREG))||(statbuf.st_size==0)){close(ffd);dprintf(csock,"ERROR OPENING: %s\r\r",name);return(-1);};
+if(fstat(ffd,&statbuf)==-1){close(ffd);dprintf(csock,"SYSTEM ERROR\r");return(-1);};
+if((!(statbuf.st_mode&S_IFMT&S_IFREG))||(statbuf.st_size==0)){close(ffd);dprintf(csock,"ERROR OPENING: %s\r",name);return(-1);};
 //START OUR SIDE
 sprintf((char*)&buf,"#BIN#%lu\r",statbuf.st_size);
 send(csock,&buf,strlen((char*)buf),0);
@@ -610,16 +610,16 @@ if(select(csock+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(csock,&readfds)){
 memset(&buf,0,sizeof(buf));
 if(recv(csock,&buf,sizeof(buf),0)>0){
 for(n=0;(n<sizeof(buf)-8)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST #, ALLOW -SOME- PLAYROOM FOR EVENTUAL '\r' AT THE START (ABORT DURING SETUP) AND OTHER CREATIVE INTERPRETATIONS
-if(!bcmp(buf+n,"#NO#",4)){close(ffd);dprintf(csock,"BGET %s REFUSED BY PEER\r\r",name);return(-1);};
+if(!bcmp(buf+n,"#NO#",4)){close(ffd);dprintf(csock,"BGET %s REFUSED BY PEER\r",name);return(-1);};
 //GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
-if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);dprintf(csock,"BGET %s REFUSED BY PEER\r\r",name);return(-1);};
+if(!bcmp(buf+n,"#ABORT#",7)){close(ffd);dprintf(csock,"BGET %s REFUSED BY PEER\r",name);return(-1);};
 if(!bcmp(buf+n,"#OK#",4))break;
 };//HANDLE OK OR NOT OK
 };//SELECT READ
 };//WHILE FETCH DATA
 
 //PEER HAS TO ACCEPT WITHIN 1 MINUTE - ALSO AT LEAST TRY TO FORCE THE PTY TO SEND THE ABORT IN IT'S VERY OWN PACKET AS PER DOCUMENTATION...
-if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BGET: %s TIMED OUT\r\r",name);return(-1);};
+if((tv.tv_sec==0)&&(tv.tv_usec==0)){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BGET: %s TIMED OUT\r",name);return(-1);};
 //MOVE TOTAL BYTES TO TRANSFER INTO SUBSTRACTION REGISTER
 remain=statbuf.st_size;
 //WHILE BYTES TO SEND LEFT, SEND BLOCKS OF DATA
@@ -639,8 +639,8 @@ if(select(nfds+1,&readfds,NULL,NULL,&tv)>0){
 if(FD_ISSET(csock,&readfds)){
 memset(&buf,0,sizeof(buf));
 if(recv(csock,&buf,sizeof(buf),0)>0){
-if(!bcmp(buf+n,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
-if(!bcmp(buf+n,"#ABORT#\r",8)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r\r",name);return(-1);};
+if(!bcmp(buf+n,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r",name);return(-1);};
+if(!bcmp(buf+n,"#ABORT#\r",8)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r",name);return(-1);};
 };//IF READ
 };//FD_ISSET PTY
 
@@ -653,17 +653,17 @@ tv.tv_sec=0;
 tv.tv_usec=100000;
 if(select(csock+1,NULL,&writefds,NULL,&tv)>0)if(FD_ISSET(csock,&writefds)){
 rbytes=read(ffd,&buf,sizeof(buf));
-if(rbytes<1){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BGET ABORTED: %s FILE READ ERROR\r\r",name);return(-1);};
+if(rbytes<1){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BGET ABORTED: %s FILE READ ERROR\r",name);return(-1);};
 remain-=rbytes;
 wbytes=send(csock,&buf,rbytes,0);
-if(wbytes<rbytes){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BGET ABORTED: %s DATA TRANSMIT ERROR\r\r",name);return(-1);};
+if(wbytes<rbytes){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BGET ABORTED: %s DATA TRANSMIT ERROR\r",name);return(-1);};
 };//FDISSET WRITE
 };//FDISSET FDD READ
 
 };//SELECT READ FILEDESCRIPTORS
 };//WHILE DATA LEFT TO SEND
 close(ffd);
-dprintf(csock,"\rBGET FILE: %s BYTES: %ld\r\r",name,statbuf.st_size);
+dprintf(csock,"\rBGET FILE: %s BYTES: %ld\r",name,statbuf.st_size);
 return(statbuf.st_size);
 };//CMDBGET
 
@@ -672,7 +672,7 @@ int n;
 if(name!=NULL){
 for(n=0;name[n]==0x20;n++);
 name=name+n;//STRIP LEADING SPACE
-if(name[0])dprintf(csock,"\rREAD: %ld BYTES\r\r",readfile(name,BPNLCR));else dprintf(csock,"ERROR OPENING: %s FILENAME?\r\r",name);
+if(name[0])dprintf(csock,"\rREAD: %ld BYTES\r",readfile(name,BPNLCR));else dprintf(csock,"ERROR OPENING: %s FILENAME?\r",name);
 };//IF PARAMETERS
 };//CMDCHDIR
 
@@ -734,7 +734,7 @@ buf[n]=0x00;
 snprintf(name,sizeof(name)-1,"%s-%s",username,buf);
 };//FILENAME ZERO RANDOMIZER
 ffd=open(name,O_WRONLY|O_CREAT|O_EXCL,00640);
-if(ffd==-1){send(csock,"#NO#\r",5,0);dprintf(csock,"BPUT ABORTED: %s FILE CREATION ERROR - NO PERMISSION HERE OR FILE EXITS\r\r",name);return(-1);};
+if(ffd==-1){send(csock,"#NO#\r",5,0);dprintf(csock,"BPUT ABORTED: %s FILE CREATION ERROR - NO PERMISSION HERE OR FILE EXITS\r",name);return(-1);};
 //GIVE OK FOR TRANSFER
 send(csock,"#OK#\r",5,0);
 while(remain>0){
@@ -745,18 +745,18 @@ FD_SET(csock,&readfds);
 if(select(csock+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(csock,&readfds)){
 memset(&buf,0,sizeof(buf));
 rbytes=recv(csock,&buf,sizeof(buf),0);
-if(rbytes<1){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BPUT ABORTED: %s DATA RECEIVE ERROR\r\r",name);return(-1);};
-if(!bcmp(buf,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r\r",name);return(-1);};
-if(!bcmp(buf,"#ABORT#\r",8)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r\r",name);return(-1);};
+if(rbytes<1){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BPUT ABORTED: %s DATA RECEIVE ERROR\r",name);return(-1);};
+if(!bcmp(buf,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r",name);return(-1);};
+if(!bcmp(buf,"#ABORT#\r",8)){close(ffd);dprintf(csock,"BPUT: %s ABORTED BY PEER\r",name);return(-1);};
 if(bcmp(buf,"SP\\-",4)){
 wbytes=write(ffd,&buf,rbytes);
-if(wbytes<rbytes){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BPUT ABORTED: %s FILE WRITE ERROR\r\r",name);return(-1);};
+if(wbytes<rbytes){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BPUT ABORTED: %s FILE WRITE ERROR\r",name);return(-1);};
 remain-=wbytes;
 };//IGNORE PRIVATE MESSAGES
 };//FDISSET FILE
 };//WHILE DATA LEFT TO SEND
 close(ffd);
-dprintf(csock,"\rBPUT FILE: %s BYTES: %ld\r\r",name,okreturn);
+dprintf(csock,"\rBPUT FILE: %s BYTES: %ld\r",name,okreturn);
 return(okreturn);
 };//CMDBPUT
 
@@ -785,7 +785,7 @@ logintime=time(NULL);
 //STRIP SSID
 memset(user,0,sizeof(user));
 for(n=0;(n<sizeof(user)-1)&&(sourcecall[n])&&(sourcecall[n]!='-');n++)user[n]=sourcecall[n];
-if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)&~O_NONBLOCK))dprintf(csock,"SYSTEM ERROR\r\r");
+if(fcntl(csock,F_SETFL,fcntl(csock,F_GETFL,0)&~O_NONBLOCK))dprintf(csock,"SYSTEM ERROR\r");
 //INIT USER
 inituser(user);
 printstatus();
