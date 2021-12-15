@@ -53,7 +53,8 @@ struct bpqethhdr{
 uint8_t ethdst[6];
 uint8_t ethsrc[6];
 uint16_t ptype;
-uint16_t len;
+uint8_t lenlsb;//DON'T ASK... IT'S ACTUALLY THE LENGTH OF THE PAYLOAD MINUS THE KISS BYTE PLUS +4 (ETHERNET CHECKSUM)
+uint8_t lenmsb;//IN LITTLE ENDIAN FORMAT OF ALL THINGS... (SO PAYLOAD LENGTH +5, IN 'REVERSE ORDER') $14 $00 (1+15+4=20=$0014)
 unsigned char payload[2048];
 };
 
@@ -182,7 +183,8 @@ sockpacket.ethdst[3]=0xFF;
 sockpacket.ethdst[4]=0xFF;
 sockpacket.ethdst[5]=0xFF;
 sockpacket.ptype=htons(ETH_P_BPQ);
-sockpacket.len=0;
+sockpacket.lenlsb=0;
+sockpacket.lenmsb=0;
 
 while(1){
 FD_ZERO(&readfds);
@@ -198,7 +200,8 @@ if(FD_ISSET(sock,&readfds)){
 bytes=recv(sock,&sockpacket.payload,sizeof(sockpacket.payload),MSG_DONTWAIT);
 if(bytes<=1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);sctpconnect(argv[2],argv[3]);};
 if(bytes>=15){//2 7 BYTE ADDRESSES, 1 CONTROL BYTE
-sockpacket.len=htons(bytes+5);
+sockpacket.lenlsb=((bytes+5)&0x00FF);
+sockpacket.lenmsb=(((bytes+5)&0xFF00)>>8);
 printf("%s INCOMING PACKET: %ld BYTES:",srcbtime(0),bytes);for(n=0;n<bytes;n++)printf(" %02X",sockpacket.payload[n]);printf("\n");
 if(write(tap,&sockpacket,bytes+16)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
 };//BYTES>=17
