@@ -112,7 +112,6 @@ break;
 int main(int argc,char**argv){
 setuplistener();
 ssize_t bytes;
-size_t n;
 uint64_t slot;
 int active;
 //ZERO CLIENTS TABLE
