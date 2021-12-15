@@ -429,9 +429,9 @@ mkdir(directory,00710);//NONE OF THE USERS CONCERN HERE - EXTERNAL PROGRAMS TO B
 chmod(directory,00710);
 chown(directory,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/UPLOAD",basepath);
-mkdir(directory,01750);//SET STICKY BIT - TEMP FILES DURING UPLOADS
-chmod(directory,01750);//PROBABLY NONE OF THE USERS CONCERN. CONTAINS UNFINISHED TEMPORARY FILES
-chown(directory,0,gid);//MAYBE DO THIS WITH O_TMPFILE INSTEAD
+mkdir(directory,01750);//SET STICKY BIT
+chmod(directory,01750);
+chown(directory,0,gid);
 snprintf(directory,sizeof(directory)-1,"%s/FILES",basepath);
 mkdir(directory,01750);//SET STICKY BIT - USERS CAN REMOVE FILES THEY UPLOADED
 chmod(directory,01750);
