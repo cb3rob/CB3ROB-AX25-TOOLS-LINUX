@@ -86,7 +86,7 @@ uint64_t dest;
 ssize_t bytes;
 tv.tv_sec=0;
 tv.tv_usec=100000;
-if(select(nfds,NULL,&writefds,NULL,&tv)>0){
+if(select(nfds+1,NULL,&writefds,NULL,&tv)>0){
 printf("%s SENT PACKET FROM: %d TO:",srcbtime(0),cl[slot].fd);
 //IF NOT READY TO SEND DATA TO RIGHT NOW WE SIMPLY SKIP THEM. CAN'T HAVE SLOW LINKS HOLD THE REST DOWN.
 for(dest=0;dest<MAXCLIENTS;dest++)if((cl[dest].fd!=-1)&&(cl[dest].fd!=cl[slot].fd)&&(FD_ISSET(cl[slot].fd,&writefds))){
