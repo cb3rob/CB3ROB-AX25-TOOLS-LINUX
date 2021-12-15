@@ -817,6 +817,7 @@ if(!bcmp(currentcmd,"MD",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmdmkd
 //ERASE
 if(!bcmp(currentcmd,"ERASE",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmderase((char*)currentcmd+5);continue;};
 if(!bcmp(currentcmd,"DEL",3))if((currentcmd[3]==0x20)||(currentcmd[3]==0)){cmderase((char*)currentcmd+3);continue;};
+if(!bcmp(currentcmd,"DELETE",6))if((currentcmd[6]==0x20)||(currentcmd[6]==0)){cmderase((char*)currentcmd+6);continue;};
 if(!bcmp(currentcmd,"RMDIR",5))if((currentcmd[5]==0x20)||(currentcmd[5]==0)){cmderase((char*)currentcmd+5);continue;};
 if(!bcmp(currentcmd,"RM",2))if((currentcmd[2]==0x20)||(currentcmd[2]==0)){cmderase((char*)currentcmd+2);continue;};
 //READ ASCII
