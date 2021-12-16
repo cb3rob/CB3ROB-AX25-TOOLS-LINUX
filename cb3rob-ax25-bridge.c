@@ -48,6 +48,7 @@
 #define MAX_PORTS 32
 #define PACKET_SIZE 1500
 #define AXALEN 7
+#define MAXDIGIS 7
 
 struct sockaddr_ll ssockaddrll;
 struct sockaddr_ll dsockaddrll;
@@ -92,6 +93,26 @@ if( (c[4]!=0x40) && ( (c[3]==0x40) || (c[4]&1) || (c[4]<0x60) || (c[4]>0xB4) || 
 if( (c[5]!=0x40) && ( (c[4]==0x40) || (c[5]&1) || (c[5]<0x60) || (c[5]>0xB4) || ((c[5]>0x72)&&(c[5]<0x82)) ) )return(-1);
 return(0);
 };//CHECKBINCALL
+
+int bincalllast(uint8_t*c){
+return(c[7]&1);
+};//BINCALLLAST
+
+int checkbinpath(uint8_t*c,ssize_t l){
+int n;
+if(c==NULL)return(-1);
+if(l<15)return(-1);//SHORT PACKET
+if(checkbincall((uint8_t*)c))return(-1);
+if(bincalllast((uint8_t*)c))return(-1);
+if(checkbincall((uint8_t*)c+7))return(-1);
+if(bincalllast((uint8_t*)c+7))return(0);//DONE
+for(n=2;MAXDIGIS+2;n++){
+if((n*7)>(l-1))return(-1);//ADDRESS+CONTROL LONGER THAN PACKET
+if(checkbincall((uint8_t*)c+(n*7)))return(-1);
+if(bincalllast((uint8_t*)c+(n*7)))return(0);//DONE
+};//FOREACH DIGIPEATER
+return(-1);//MAXDIGIS RAN OUT
+};//CHECKBINPATH
 
 char*bincalltoascii(uint8_t*c){
 static char a[10];
@@ -205,7 +226,7 @@ if(buf[0]!=0)continue;
 if(ssockaddrll.sll_protocol!=htons(ETH_P_AX25))continue;
 if(ssockaddrll.sll_family!=AF_PACKET)continue;
 if(ssockaddrll.sll_hatype!=ARPHRD_AX25)continue;
-if(checkbincall((uint8_t*)buf+1)||checkbincall((uint8_t*)buf+8))continue;
+if(checkbinpath((uint8_t*)buf+1,bytes-1))continue;
 printf("====================\n");
 printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X FROM: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),bincalltoascii((uint8_t*)buf+8));
 printf("TO: %s SIZE: %ld\n",bincalltoascii((uint8_t*)buf+1),bytes);

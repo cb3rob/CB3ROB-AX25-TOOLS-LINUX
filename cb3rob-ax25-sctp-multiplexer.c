@@ -18,6 +18,7 @@
 #define MAXPACKETLENGTH 3000
 #define MAXCLIENTS 100
 #define MAXBACKLOG 16
+#define MAXDIGIS 7
 
 struct timeval tv;
 
@@ -44,6 +45,16 @@ struct packet ax25frame;
 
 unsigned char sctppacket[1500];
 
+char*srcbtime(time_t t){
+static char rcbt[22];
+struct tm*ts;
+if(!t)t=time(NULL);
+ts=gmtime(&t);
+memset(&rcbt,0,sizeof(rcbt));
+snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,ts->tm_mon+1,ts->tm_mday,ts->tm_hour,ts->tm_min,ts->tm_sec);
+return(rcbt);
+};//SRCBTIME
+
 int checkbincall(uint8_t*c){
 if(c==NULL)return(-1);
 if(                 (                 (c[0]&1) || (c[0]<0x60) || (c[0]>0xB4) || ((c[0]>0x72)&&(c[0]<0x82)) ) )return(-1);
@@ -54,6 +65,26 @@ if( (c[4]!=0x40) && ( (c[3]==0x40) || (c[4]&1) || (c[4]<0x60) || (c[4]>0xB4) || 
 if( (c[5]!=0x40) && ( (c[4]==0x40) || (c[5]&1) || (c[5]<0x60) || (c[5]>0xB4) || ((c[5]>0x72)&&(c[5]<0x82)) ) )return(-1);
 return(0);
 };//CHECKBINCALL
+
+int bincalllast(uint8_t*c){
+return(c[7]&1);
+};//BINCALLLAST
+
+int checkbinpath(uint8_t*c,ssize_t l){
+int n;
+if(c==NULL)return(-1);
+if(l<15)return(-1);//SHORT PACKET
+if(checkbincall((uint8_t*)c))return(-1);
+if(bincalllast((uint8_t*)c))return(-1);
+if(checkbincall((uint8_t*)c+7))return(-1);
+if(bincalllast((uint8_t*)c+7))return(0);//DONE
+for(n=2;MAXDIGIS+2;n++){
+if((n*7)>(l-1))return(-1);//ADDRESS+CONTROL LONGER THAN PACKET
+if(checkbincall((uint8_t*)c+(n*7)))return(-1);
+if(bincalllast((uint8_t*)c+(n*7)))return(0);//DONE
+};//FOREACH DIGIPEATER
+return(-1);//MAXDIGIS RAN OUT
+};//CHECKBINPATH
 
 char*bincalltoascii(uint8_t*c){
 static char a[10];
@@ -69,16 +100,6 @@ a[n++]=0x31;a[n++]=((c[6]>>1)&0x0F)+0x26;
 for(;n<sizeof(a);n++)a[n]=0;
 return(a);
 };//BINCALLTOASCII
-
-char*srcbtime(time_t t){
-static char rcbt[22];
-struct tm*ts;
-if(!t)t=time(NULL);
-ts=gmtime(&t);
-memset(&rcbt,0,sizeof(rcbt));
-snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,ts->tm_mon+1,ts->tm_mday,ts->tm_hour,ts->tm_min,ts->tm_sec);
-return(rcbt);
-};//SRCBTIME
 
 void printpacket(uint64_t slot){
 int n;
@@ -172,8 +193,7 @@ if(bytes<1){disconnect(slot);continue;};
 cl[slot].ax25frame.offset=bytes;
 bcopy(sctppacket,cl[slot].ax25frame.data,bytes);
 //CHECK AX-25 FRAME VALIDITY HERE LATER ON
-if(checkbincall((uint8_t*)&cl[slot].ax25frame.data)){printf("INVALID DESTINATION ADDRESS\n");printpacket(slot);wipe(slot);continue;};
-if(checkbincall((uint8_t*)&cl[slot].ax25frame.data+7)){printf("INVALID SOURCE ADDRESS\n");printpacket(slot);wipe(slot);continue;};
+if(checkbinpath((uint8_t*)&cl[slot].ax25frame.data,cl[slot].ax25frame.offset)){printf("INVALID ADDRESS IN PATH\n");printpacket(slot);wipe(slot);continue;};
 printf("COMPLETE!\n");cl[slot].lastvalid=time(NULL);printpacket(slot);broadcast(slot);wipe(slot);
 };//FOR CLIENTS LOOP
 

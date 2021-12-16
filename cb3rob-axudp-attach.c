@@ -31,6 +31,8 @@
 #include<time.h>
 #include<unistd.h>
 
+#define MAXDIGIS 7
+
 struct sockaddr_in saddr;
 struct sockaddr_in baddr;
 struct timeval tv;
@@ -155,6 +157,52 @@ memset(&rcbt,0,sizeof(rcbt));
 snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,ts->tm_mon+1,ts->tm_mday,ts->tm_hour,ts->tm_min,ts->tm_sec);
 return(rcbt);
 };//SRCBTIME
+
+int checkbincall(uint8_t*c){
+if(c==NULL)return(-1);
+if(                 (                 (c[0]&1) || (c[0]<0x60) || (c[0]>0xB4) || ((c[0]>0x72)&&(c[0]<0x82)) ) )return(-1);
+if( (c[1]!=0x40) && (                 (c[1]&1) || (c[1]<0x60) || (c[1]>0xB4) || ((c[1]>0x72)&&(c[1]<0x82)) ) )return(-1);
+if( (c[2]!=0x40) && ( (c[1]==0x40) || (c[2]&1) || (c[2]<0x60) || (c[2]>0xB4) || ((c[2]>0x72)&&(c[2]<0x82)) ) )return(-1);
+if( (c[3]!=0x40) && ( (c[2]==0x40) || (c[3]&1) || (c[3]<0x60) || (c[3]>0xB4) || ((c[3]>0x72)&&(c[3]<0x82)) ) )return(-1);
+if( (c[4]!=0x40) && ( (c[3]==0x40) || (c[4]&1) || (c[4]<0x60) || (c[4]>0xB4) || ((c[4]>0x72)&&(c[4]<0x82)) ) )return(-1);
+if( (c[5]!=0x40) && ( (c[4]==0x40) || (c[5]&1) || (c[5]<0x60) || (c[5]>0xB4) || ((c[5]>0x72)&&(c[5]<0x82)) ) )return(-1);
+return(0);
+};//CHECKBINCALL
+
+int bincalllast(uint8_t*c){
+return(c[7]&1);
+};//BINCALLLAST
+
+int checkbinpath(uint8_t*c,ssize_t l){
+int n;
+if(c==NULL)return(-1);
+if(l<15)return(-1);//SHORT PACKET
+if(checkbincall((uint8_t*)c))return(-1);
+if(bincalllast((uint8_t*)c))return(-1);
+if(checkbincall((uint8_t*)c+7))return(-1);
+if(bincalllast((uint8_t*)c+7))return(0);//DONE
+for(n=2;MAXDIGIS+2;n++){
+if((n*7)>(l-1))return(-1);//ADDRESS+CONTROL LONGER THAN PACKET
+if(checkbincall((uint8_t*)c+(n*7)))return(-1);
+if(bincalllast((uint8_t*)c+(n*7)))return(0);//DONE
+};//FOREACH DIGIPEATER
+return(-1);//MAXDIGIS RAN OUT
+};//CHECKBINPATH
+
+char*bincalltoascii(uint8_t*c){
+static char a[10];
+int n;
+if(c==NULL)return(NULL);
+for(n=0;(n<6)&&(c[n]!=0x40);n++)a[n]=(c[n]>>1);
+if((c[6]>>1)&0x0F){
+a[n++]='-';
+if(((c[6]>>1)&0x0F)>=10){
+a[n++]=0x31;a[n++]=((c[6]>>1)&0x0F)+0x26;
+}else a[n++]=0x30+((c[6]>>1)&0x0F);
+};//IF SSID
+for(;n<sizeof(a);n++)a[n]=0;
+return(a);
+};//BINCALLTOASCII
 
 int calltobin(char*ascii,ax25_address*bin){
 int n;
@@ -297,6 +345,7 @@ sockpacket.lenmsb=(((bytes+5)&0xFF00)>>8);
 fcs16=ntohs(compute_crc(sockpacket.payload,bytes-2));
 printf("%s INCOMING FCS: %04X MSB: %02X LSB: %02X %ld BYTES:",srcbtime(0),fcs16,sockpacket.payload[bytes-2],sockpacket.payload[bytes-1],bytes-2);for(n=0;n<bytes;n++)printf(" %02X",sockpacket.payload[n]);printf("\n");
 if((sockpacket.payload[(bytes-2)]!=(fcs16>>8))||(sockpacket.payload[(bytes-1)]!=(fcs16&0x00FF))){printf("%s INCOMING FCS FAILED\n",srcbtime(0));continue;};
+if(checkbinpath((uint8_t*)sockpacket.payload,bytes-2)){printf("%s INCOMING PATH CHECK FAILED\n",srcbtime(0));continue;};
 if(write(tap,&sockpacket,bytes+14)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
 };//BYTES>=17
 };//FDSET
@@ -310,6 +359,7 @@ fcs16=ntohs(compute_crc(tappacket.payload,bytes-16));
 tappacket.payload[bytes-16]=(fcs16>>8);//FCS MSB
 tappacket.payload[bytes-15]=(fcs16&0x00FF);//FCS LSB
 printf("%s OUTGOING FCS: %04X MSB: %02X LSB: %02X %ld BYTES:",srcbtime(0),fcs16,tappacket.payload[bytes-16],tappacket.payload[bytes-15],bytes-14);for(n=0;n<bytes-14;n++)printf(" %02X",tappacket.payload[n]);printf("\n");
+if(checkbinpath((uint8_t*)tappacket.payload,bytes-16)){printf("%s OUTGOING PATH CHECK FAILED\n",srcbtime(0));continue;};
 if(send(sock,&tappacket.payload,bytes-14,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);udpconnect(argv[2],argv[3]);};
 }else{printf("%s TAP DEVICE IGNORED NON BPQ PROTOCOL FAMILY: %04X PACKET\n",srcbtime(0),ntohs(tappacket.ptype));};//BPQ FRAME
 };//BYTES>0
