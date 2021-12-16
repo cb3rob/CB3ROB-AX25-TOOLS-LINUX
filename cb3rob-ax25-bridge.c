@@ -202,9 +202,9 @@ pctr++;
 if(ssockaddrll.sll_protocol!=htons(ETH_P_AX25))continue;
 if(ssockaddrll.sll_family!=AF_PACKET)continue;
 if(ssockaddrll.sll_hatype!=ARPHRD_AX25)continue;
-if((!checkbincall(buf+1))||(!checkbincall(buf+8)))continue;
 printf("====================\n");
 printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),bincalltoascii(pctr));
+if((!checkbincall((uint8_t*)buf+1))||(!checkbincall((uint8_t*)buf+7)))printf("INVALID\n");
 pctr+=AXALEN;
 //SRC ADDR
 printf("FROM: %s SIZE: %ld\n",bincalltoascii(pctr),bytes);
