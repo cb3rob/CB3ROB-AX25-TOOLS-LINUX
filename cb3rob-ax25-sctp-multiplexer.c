@@ -82,8 +82,8 @@ return(rcbt);
 
 void printpacket(uint64_t slot){
 int n;
-printf("%s SOURCE ADDRESS: %s ",srcbtime(cl[slot].lastvalid),bincalltoascii((uint8_t*)cl[slot].ax25frame.data+7));
-printf("DESTINATION ADDRESS: %s SLOT: %d - %lu BYTES:",bincalltoascii((uint8_t*)cl[slot].ax25frame.data+7),cl[slot].fd,cl[slot].ax25frame.offset);
+printf("%s SOURCE: %s ",srcbtime(cl[slot].lastvalid),bincalltoascii((uint8_t*)cl[slot].ax25frame.data+7));
+printf("DESTINATION: %s SLOT: %d - %lu BYTES:",bincalltoascii((uint8_t*)cl[slot].ax25frame.data),cl[slot].fd,cl[slot].ax25frame.offset);
 if(!cl[slot].ax25frame.offset)printf(" SIZE-ZERO"); else for(n=0;n<cl[slot].ax25frame.offset;n++)printf(" %02X",cl[slot].ax25frame.data[n]);
 printf("\n");
 };//PRINTPACKET
