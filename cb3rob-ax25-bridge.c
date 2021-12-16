@@ -144,7 +144,6 @@ int main(int argc,char**argv){
 ssize_t bytes;
 int po;
 
-uint8_t*pctr;
 uint8_t buf[PACKET_SIZE];
 
 fd_set readfds;
@@ -195,19 +194,15 @@ if(FD_ISSET(sock,&readfds)){
 bytes=recvfrom(sock,&buf,sizeof(buf),0,(struct sockaddr*)&ssockaddrll,&clen);
 //SHORT PACKET (NOT AX.25)
 if(bytes<16)continue;
-pctr=buf;
 //KISS byte
-if(pctr[0]!=0)continue;
-pctr++;
+if(buf[0]!=0)continue;
 if(ssockaddrll.sll_protocol!=htons(ETH_P_AX25))continue;
 if(ssockaddrll.sll_family!=AF_PACKET)continue;
 if(ssockaddrll.sll_hatype!=ARPHRD_AX25)continue;
+if(checkbincall((uint8_t*)buf+1)||checkbincall((uint8_t*)buf+8))continue;
 printf("====================\n");
-printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),bincalltoascii(pctr));
-if((!checkbincall((uint8_t*)buf+1))||(!checkbincall((uint8_t*)buf+8)))printf("INVALID\n");
-pctr+=AXALEN;
-//SRC ADDR
-printf("FROM: %s SIZE: %ld\n",bincalltoascii(pctr),bytes);
+printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X FROM: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),bincalltoascii((uint8_t*)buf+8));
+printf("TO: %s SIZE: %ld\n",bincalltoascii((uint8_t*)buf+1),bytes);
 dsockaddrll.sll_family=ssockaddrll.sll_family;
 dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
 dsockaddrll.sll_hatype=ssockaddrll.sll_hatype;
@@ -217,7 +212,7 @@ if(myinterfaces[po].ifindex==ssockaddrll.sll_ifindex)continue;
 //NOT BRIDGING TO INTERFACES THAT ARE NOT UP
 if(!(myinterfaces[po].status&(IFF_UP|IFF_RUNNING))){needreload=1;continue;};
 //ALL FINE, FORWARD PACKET
-printf("%s FORWARDING PACKET OVER INTERFACE %s (%d) TO %s\n",srcbtime(0),myinterfaces[po].ifname,myinterfaces[po].ifindex,bincalltoascii(buf+1));
+printf("%s FORWARDING PACKET OVER INTERFACE %s (%d) TO %s\n",srcbtime(0),myinterfaces[po].ifname,myinterfaces[po].ifindex,bincalltoascii((uint8_t*)buf+1));
 dsockaddrll.sll_ifindex=myinterfaces[po].ifindex;
 if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,sizeof(struct sockaddr_ll))==-1){perror("SENDTO");needreload=1;continue;};
 };//FOR FORWARD PACKET TO EACH INTERFACE THAT WAS UP AT PROGRAM START IT DID NOT ORIGINATE FROM
