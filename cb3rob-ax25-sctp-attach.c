@@ -15,11 +15,11 @@
 #include<linux/if.h>
 #include<linux/if_arp.h>
 #include<linux/if_tun.h>
-#include<linux/if_slip.h>
 #include<linux/sctp.h>
 #include<netdb.h>
 #include<netinet/in.h>
 #include<stdio.h>
+#include<stdint.h>
 #include<stdlib.h>
 #include<string.h>
 #include<sys/ioctl.h>
@@ -27,13 +27,10 @@
 #include<sys/stat.h>
 #include<sys/time.h>
 #include<sys/types.h>
-#include<syslog.h>
-#include<termios.h>
 #include<time.h>
 #include<unistd.h>
 
 struct sockaddr_in saddr;
-struct sockaddr_in baddr;
 struct timeval tv;
 struct hostent*he;
 int sock;
