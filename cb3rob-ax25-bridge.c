@@ -82,13 +82,25 @@ snprintf(rcbt,sizeof(rcbt)-1,"%04d-%02d-%02dT%02d:%02d:%02dZ",ts->tm_year+1900,t
 return(rcbt);
 };//SRCBTIME
 
-char*displaycall(uint8_t*c){
+int checkbincall(uint8_t*c){
+if(c==NULL)return(-1);
+if(                 (                 (c[0]&1) || (c[0]<0x60) || (c[0]>0xB4) || ((c[0]>0x72)&&(c[0]<0x82)) ) )return(-1);
+if( (c[1]!=0x40) && (                 (c[1]&1) || (c[1]<0x60) || (c[1]>0xB4) || ((c[1]>0x72)&&(c[1]<0x82)) ) )return(-1);
+if( (c[2]!=0x40) && ( (c[1]==0x40) || (c[2]&1) || (c[2]<0x60) || (c[2]>0xB4) || ((c[2]>0x72)&&(c[2]<0x82)) ) )return(-1);
+if( (c[3]!=0x40) && ( (c[2]==0x40) || (c[3]&1) || (c[3]<0x60) || (c[3]>0xB4) || ((c[3]>0x72)&&(c[3]<0x82)) ) )return(-1);
+if( (c[4]!=0x40) && ( (c[3]==0x40) || (c[4]&1) || (c[4]<0x60) || (c[4]>0xB4) || ((c[4]>0x72)&&(c[4]<0x82)) ) )return(-1);
+if( (c[5]!=0x40) && ( (c[4]==0x40) || (c[5]&1) || (c[5]<0x60) || (c[5]>0xB4) || ((c[5]>0x72)&&(c[5]<0x82)) ) )return(-1);
+return(0);
+};//CHECKBINCALL
+
+char*bincalltoascii(uint8_t*c){
 static char a[10];
 int n;
+if(c==NULL)return(NULL);
 for(n=0;(n<6)&&(c[n]!=0x40);n++)a[n]=(c[n]>>1);
 snprintf(&a[n],4,"-%d",(c[6]>>1)&0x0F);
 return(a);
-};//DISPLAYCALL
+};//BINCALLTOASCII
 
 //SIGNALHANDLER HUP
 void requestreload(int signum){needreload=1;};
@@ -112,7 +124,7 @@ if(ioctl(sock,SIOCGIFHWADDR,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 if(ifr.ifr_hwaddr.sa_family==AF_AX25){
 bcopy(ifr.ifr_hwaddr.sa_data,myinterfaces[portcount].netcall,7);
 strncpy(myinterfaces[portcount].ifname,ifr.ifr_name,sizeof(myinterfaces[portcount].ifname));
-strncpy(myinterfaces[portcount].asciicall,displaycall((uint8_t*)myinterfaces[portcount].netcall),sizeof(myinterfaces[portcount].asciicall)-1);
+strncpy(myinterfaces[portcount].asciicall,bincalltoascii((uint8_t*)myinterfaces[portcount].netcall),sizeof(myinterfaces[portcount].asciicall)-1);
 if(ioctl(sock,SIOCGIFFLAGS,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 myinterfaces[portcount].status=ifr.ifr_flags;
 if(ioctl(sock,SIOCGIFINDEX,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
@@ -190,11 +202,12 @@ pctr++;
 if(ssockaddrll.sll_protocol!=htons(ETH_P_AX25))continue;
 if(ssockaddrll.sll_family!=AF_PACKET)continue;
 if(ssockaddrll.sll_hatype!=ARPHRD_AX25)continue;
+if((!checkbincall(buf+1))||(!checkbincall(buf+8)))continue;
 printf("====================\n");
-printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),displaycall(pctr));
+printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X TO: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),bincalltoascii(pctr));
 pctr+=AXALEN;
 //SRC ADDR
-printf("FROM: %s SIZE: %ld\n",displaycall(pctr),bytes);
+printf("FROM: %s SIZE: %ld\n",bincalltoascii(pctr),bytes);
 dsockaddrll.sll_family=ssockaddrll.sll_family;
 dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
 dsockaddrll.sll_hatype=ssockaddrll.sll_hatype;
@@ -204,7 +217,7 @@ if(myinterfaces[po].ifindex==ssockaddrll.sll_ifindex)continue;
 //NOT BRIDGING TO INTERFACES THAT ARE NOT UP
 if(!(myinterfaces[po].status&(IFF_UP|IFF_RUNNING))){needreload=1;continue;};
 //ALL FINE, FORWARD PACKET
-printf("%s FORWARDING PACKET OVER INTERFACE %s (%d) TO %s\n",srcbtime(0),myinterfaces[po].ifname,myinterfaces[po].ifindex,displaycall(buf+1));
+printf("%s FORWARDING PACKET OVER INTERFACE %s (%d) TO %s\n",srcbtime(0),myinterfaces[po].ifname,myinterfaces[po].ifindex,bincalltoascii(buf+1));
 dsockaddrll.sll_ifindex=myinterfaces[po].ifindex;
 if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,sizeof(struct sockaddr_ll))==-1){perror("SENDTO");needreload=1;continue;};
 };//FOR FORWARD PACKET TO EACH INTERFACE THAT WAS UP AT PROGRAM START IT DID NOT ORIGINATE FROM
