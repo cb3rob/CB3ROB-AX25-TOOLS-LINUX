@@ -170,7 +170,7 @@ return(0);
 };//CHECKBINCALL
 
 int bincalllast(uint8_t*c){
-return(c[7]&1);
+return(c[6]&1);
 };//BINCALLLAST
 
 int checkbinpath(uint8_t*c,ssize_t l){
@@ -181,7 +181,7 @@ if(checkbincall((uint8_t*)c))return(-1);
 if(bincalllast((uint8_t*)c))return(-1);
 if(checkbincall((uint8_t*)c+7))return(-1);
 if(bincalllast((uint8_t*)c+7))return(0);//DONE
-for(n=2;MAXDIGIS+2;n++){
+for(n=2;n<MAXDIGIS+2;n++){
 if((n*7)>(l-1))return(-1);//ADDRESS+CONTROL LONGER THAN PACKET
 if(checkbincall((uint8_t*)c+(n*7)))return(-1);
 if(bincalllast((uint8_t*)c+(n*7)))return(0);//DONE
