@@ -44,6 +44,26 @@ struct packet ax25frame;
 
 unsigned char sctppacket[1500];
 
+int checkbincall(uint8_t*c){
+if(c==NULL)return(-1);
+if(                 (                 (c[0]&1) || (c[0]<0x60) || (c[0]>0xB4) || ((c[0]>0x72)&&(c[0]<0x82)) ) )return(-1);
+if( (c[1]!=0x40) && (                 (c[1]&1) || (c[1]<0x60) || (c[1]>0xB4) || ((c[1]>0x72)&&(c[1]<0x82)) ) )return(-1);
+if( (c[2]!=0x40) && ( (c[1]==0x40) || (c[2]&1) || (c[2]<0x60) || (c[2]>0xB4) || ((c[2]>0x72)&&(c[2]<0x82)) ) )return(-1);
+if( (c[3]!=0x40) && ( (c[2]==0x40) || (c[3]&1) || (c[3]<0x60) || (c[3]>0xB4) || ((c[3]>0x72)&&(c[3]<0x82)) ) )return(-1);
+if( (c[4]!=0x40) && ( (c[3]==0x40) || (c[4]&1) || (c[4]<0x60) || (c[4]>0xB4) || ((c[4]>0x72)&&(c[4]<0x82)) ) )return(-1);
+if( (c[5]!=0x40) && ( (c[4]==0x40) || (c[5]&1) || (c[5]<0x60) || (c[5]>0xB4) || ((c[5]>0x72)&&(c[5]<0x82)) ) )return(-1);
+return(0);
+};//CHECKBINCALL
+
+char*bincalltoascii(uint8_t*c){
+static char a[10];
+int n;
+if(c==NULL)return(NULL);
+for(n=0;(n<6)&&(c[n]!=0x40);n++)a[n]=(c[n]>>1);
+snprintf(&a[n],4,"-%d",(c[6]>>1)&0x0F);
+return(a);
+};//DISPLAYCALL
+
 char*srcbtime(time_t t){
 static char rcbt[22];
 struct tm*ts;
@@ -145,6 +165,8 @@ if(bytes<1){disconnect(slot);continue;};
 cl[slot].ax25frame.offset=bytes;
 bcopy(sctppacket,cl[slot].ax25frame.data,bytes);
 //CHECK AX-25 FRAME VALIDITY HERE LATER ON
+if(checkbincall((uint8_t)cl[slot].ax25frame.data)){printf("INVALID DESTINATION ADDRESS\n");printpacket(slot);wipe(slot);continue;};
+if(checkbincall((uint8_t)cl[slot].ax25frame.data+7)){printf("INVALID SOURCE ADDRESS\n");printpacket(slot);wipe(slot);continue;};
 printf("COMPLETE!\n");cl[slot].lastvalid=time(NULL);printpacket(slot);broadcast(slot);wipe(slot);
 };//FOR CLIENTS LOOP
 
