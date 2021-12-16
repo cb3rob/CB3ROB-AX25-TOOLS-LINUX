@@ -165,8 +165,8 @@ if(bytes<1){disconnect(slot);continue;};
 cl[slot].ax25frame.offset=bytes;
 bcopy(sctppacket,cl[slot].ax25frame.data,bytes);
 //CHECK AX-25 FRAME VALIDITY HERE LATER ON
-if(checkbincall((uint8_t)cl[slot].ax25frame.data)){printf("INVALID DESTINATION ADDRESS\n");printpacket(slot);wipe(slot);continue;};
-if(checkbincall((uint8_t)cl[slot].ax25frame.data+7)){printf("INVALID SOURCE ADDRESS\n");printpacket(slot);wipe(slot);continue;};
+if(checkbincall((uint8_t*)&cl[slot].ax25frame.data)){printf("INVALID DESTINATION ADDRESS\n");printpacket(slot);wipe(slot);continue;};
+if(checkbincall((uint8_t*)&cl[slot].ax25frame.data+7)){printf("INVALID SOURCE ADDRESS\n");printpacket(slot);wipe(slot);continue;};
 printf("COMPLETE!\n");cl[slot].lastvalid=time(NULL);printpacket(slot);broadcast(slot);wipe(slot);
 };//FOR CLIENTS LOOP
 
