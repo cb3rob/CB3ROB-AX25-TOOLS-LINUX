@@ -98,7 +98,13 @@ static char a[10];
 int n;
 if(c==NULL)return(NULL);
 for(n=0;(n<6)&&(c[n]!=0x40);n++)a[n]=(c[n]>>1);
-snprintf(&a[n],4,"-%d",(c[6]>>1)&0x0F);
+if((c[6]>>1)&0x0F){
+a[n++]='-';
+if(((c[6]>>1)&0x0F)>=10){
+a[n++]=0x31;a[n++]=((c[6]>>1)&0x0F)+0x26;
+}else a[n++]=0x30+((c[6]>>1)&0x0F);
+};//IF SSID
+for(;n<sizeof(a);n++)a[n]=0;
 return(a);
 };//BINCALLTOASCII
 
