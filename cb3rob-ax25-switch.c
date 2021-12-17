@@ -47,6 +47,7 @@
 
 #define MAX_PORTS 32
 #define PACKET_SIZE 1500
+#define ROUTEEXPIRY 90
 #define AXALEN 7
 #define MAXDIGIS 7
 
@@ -207,14 +208,14 @@ if(thisrte!=NULL)printf("%s ROUTER FIND CALLSIGN: %s VIA DEVICE: %d\n",srcbtime(
 return(thisrte);
 };//DELROUTE
 
-struct route *delport(int port){
+struct route *delport(int port,int live){
 struct route *thisrte;
 struct route *prevrte;
 struct route *delrte;
 time_t nowtime;
 time_t purgetime;
 nowtime=time(NULL);
-purgetime=nowtime-30;
+purgetime=nowtime-live;
 prevrte=NULL;
 delrte=NULL;
 printf("%s ROUTER DELETE PORT: %d\n",srcbtime(0),port);
@@ -300,7 +301,7 @@ freeifaddrs(ifaddr);
 needreload=0;
 printf("%s DONE SCANNING INTERFACES\n",srcbtime(0));
 lastreload=time(NULL);
-expireroute(30);
+expireroute(ROUTEEXPIRY);
 printroutes();
 if(portcount<2){printf("%s INSUFFICIENT (%d) AX.25 PORTS FOR BRIDGING\n",srcbtime(0),portcount);needreload=1;sleep(5);};//INSUFFICIENT
 };//GETINTERFACES
@@ -387,11 +388,11 @@ if(!(myinterfaces[po].status&(IFF_UP|IFF_RUNNING))){needreload=1;continue;};
 //ALL FINE, FORWARD PACKET
 printf("%s FORWARDING PACKET OVER INTERFACE %s (%d) TO %s\n",srcbtime(0),myinterfaces[po].ifname,myinterfaces[po].ifindex,bincalltoascii((uint8_t*)buf+1));
 dsockaddrll.sll_ifindex=myinterfaces[po].ifindex;
-if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,sizeof(struct sockaddr_ll))==-1){perror("SENDTO");needreload=1;continue;};
+if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,sizeof(struct sockaddr_ll))==-1){perror("SENDTO");delport(dsockaddrll.sll_ifindex,ROUTEEXPIRY);needreload=1;continue;};
 };//FOR FORWARD PACKET TO EACH INTERFACE THAT WAS UP AT PROGRAM START IT DID NOT ORIGINATE FROM
 };//FD_SET
 //RELOAD EVERY 2 MINUTES ANYWAY
 if(lastreload<(time(NULL)-120))needreload=1;
-expireroute(30);
+expireroute(ROUTEEXPIRY);
 };//WHILE 1
 };//MAIN
