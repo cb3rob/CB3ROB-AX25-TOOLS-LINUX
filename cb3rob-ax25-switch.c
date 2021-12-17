@@ -1,19 +1,30 @@
-// CB3ROB Tactical Systems AX.25 Bridge for Linux. (APRS/Packet Radio)
-// 2016 HRH Prince Sven Olaf of CyberBunker-Kamphuis (CB3ROB / RCB1AA)
-// VERSION 2.0 RELEASE
+// CB3ROB Tactical Systems AX.25 Switch for Linux. (APRS/Packet Radio)
+// 2021 HRH Prince Sven Olaf of CyberBunker-Kamphuis (CB3ROB / RCB1AA)
+// VERSION 1.0 RELEASE
 
 // [client] [client] [client] [bbs] [digipeater] (each with their own callsign or ssid)
 //    |        |         |      |     |
 //    +--------+---------+------+-----+          (ethernet switch/vlan/etc)
 //                |
-//          [bridging box]                       (can NOT reliably run AX.25 terminal/servers at the same time)
+//          [switching box]                      (can NOT reliably run AX.25 terminal/servers at the same time)
 //                |
 //              [tnc]        \~/                 (callsign of interfaces is irrelevant)
 //                |           |
-//            [tranceiver]----+                  (callsigns on interfaces on the bridge do not show up in the path)
+//            [tranceiver]----+                  (callsigns on interfaces on the switch do not show up in the path)
 
-// Warning: when connecting multiple tnc/tranceivers or soundmodems packets between them are also bridged
-// This can be used to bridge different frequencies together but would usually be undesired.
+// When connecting multiple tnc/tranceivers or soundmodems packets between them are also switched
+// This can be used to bridge different frequencies and make transparent interconnects possible.
+// as this is the switch version, (unlike the bridge version) it won't flood the other frequency.
+
+// Interface routes to the source destinations will be learned whenever they send a packet (SABM, etc)
+// As soon as a specific route to a specific address is known (After the first packet sent by it) traffic to it
+// will no longer be sent to all the ports but just to the port it's connected to.
+// This prevents one network flooding another network as it, at most, lets initial connect requests and beacons
+// spread over all connected network segments, established sessions will always only affect the needed networks
+// Traffic between nodes on the same network segment will not affect other networks after the initial packets.
+
+// The route cache is based on SOURCE callsign-ssid entries and has a default expiry time of 90 seconds,
+// it's destination port is updated on every received packet and it's expiry time is set back to 90 seconds.
 
 // Packets will appear on the radio with the callsign of the ethernet connected clients.
 // Packets from the radio(s) will appear at all ethernet connected clients.
