@@ -62,6 +62,8 @@ time_t lastreload;
 
 int sock;
 
+int po;
+
 struct route{
 union{
 uint64_t intcall;
@@ -152,7 +154,7 @@ uint8_t tmpcall[8];
 tmp.tmpcall64=0;
 bcopy(bincall,tmp.tmpcall,6);tmp.tmpcall[6]=bincall[6]&0x1E;
 prevrte=NULL;
-printf("%s ROUTER SET CALLSIGN %s TO PORT %d\n",srcbtime(0),bincalltoascii((uint8_t*)bincall),port);
+printf("%s ROUTER SET CALLSIGN: %s VIA DEVICE: %d\n",srcbtime(0),bincalltoascii((uint8_t*)bincall),port);
 for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next)if(tmp.tmpcall64==thisrte->intcall)break;else prevrte=thisrte;
 if(thisrte==NULL){
 thisrte=malloc(sizeof(struct route));
@@ -200,8 +202,8 @@ uint8_t tmpcall[8];
 }tmp;
 tmp.tmpcall64=0;
 bcopy(bincall,tmp.tmpcall,6);tmp.tmpcall[6]=bincall[6]&0x1E;
-printf("%s ROUTER FIND CALLSIGN: %s\n",srcbtime(0),bincalltoascii((uint8_t*)bincall));
 for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next)if(thisrte->intcall==tmp.tmpcall64)break;
+if(thisrte!=NULL)printf("%s ROUTER FIND CALLSIGN: %s VIA DEVICE: %d\n",srcbtime(0),bincalltoascii((uint8_t*)bincall),thisrte->port);
 return(thisrte);
 };//DELROUTE
 
@@ -209,14 +211,17 @@ struct route *delport(int port){
 struct route *thisrte;
 struct route *prevrte;
 struct route *delrte;
+time_t nowtime;
 time_t purgetime;
-purgetime=time(NULL)-30;
+nowtime=time(NULL);
+purgetime=nowtime-30;
 prevrte=NULL;
 delrte=NULL;
 printf("%s ROUTER DELETE PORT: %d\n",srcbtime(0),port);
 for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next){
 if(delrte!=NULL){memset(delrte,0,sizeof(struct route));free(delrte);delrte=NULL;};
 if((thisrte->port==port)||(thisrte->lastseen<purgetime)){
+printf("%s ROUTER PURGED ROUTE TO: %s OVER DEVICE: %d LIVETIME: %ld SECONDS\n",srcbtime(0),bincalltoascii(thisrte->bincall),thisrte->port,nowtime-thisrte->lastseen);
 if(startrte==thisrte)startrte=thisrte->next;
 if(prevrte!=NULL)prevrte->next=thisrte->next;
 delrte=thisrte;
@@ -230,14 +235,20 @@ struct route *expireroute(time_t live){
 struct route *thisrte;
 struct route *prevrte;
 struct route *delrte;
+time_t nowtime;
 time_t purgetime;
-purgetime=time(NULL)-live;
+nowtime=time(NULL);
+purgetime=nowtime-live;
 prevrte=NULL;
 delrte=NULL;
 printf("%s ROUTER EXPIRY CHECK: %lu SECONDS\n",srcbtime(0),live);
 for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next){
 if(delrte!=NULL){memset(delrte,0,sizeof(struct route));free(delrte);delrte=NULL;};
-if(thisrte->lastseen<purgetime){
+//CHECK IF WE HAVE A myinterfaces TABLE ENTRY FOR THAT IFINDEX
+for(po=0;po<portcount;po++)if(thisrte->port==myinterfaces[po].ifindex)break;
+//IF EXPIRED OR INTERFACE IS GONE, DELETE
+if((thisrte->lastseen<purgetime)||(po==portcount)){
+printf("%s ROUTER PURGED ROUTE TO: %s OVER DEVICE: %d LIVETIME: %ld SECONDS\n",srcbtime(0),bincalltoascii(thisrte->bincall),thisrte->port,nowtime-thisrte->lastseen);
 if(startrte==thisrte)startrte=thisrte->next;
 if(prevrte!=NULL)prevrte->next=thisrte->next;
 delrte=thisrte;
@@ -251,7 +262,7 @@ void printroutes(){
 time_t purgetime;
 purgetime=time(NULL);
 struct route *thisrte;
-for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next)printf("CALL: %-12s PORT: %10d %10ld\n",bincalltoascii(thisrte->bincall),thisrte->port,purgetime-thisrte->lastseen);
+for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next)printf("CALLSIGN: %-12s PORT: %10d LIVETIME; %10ld SECONDS\n",bincalltoascii(thisrte->bincall),thisrte->port,purgetime-thisrte->lastseen);
 };//PRINTROUTE
 
 //SIGNALHANDLER HUP
@@ -281,7 +292,7 @@ if(ioctl(sock,SIOCGIFFLAGS,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 myinterfaces[portcount].status=ifr.ifr_flags;
 if(ioctl(sock,SIOCGIFINDEX,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 myinterfaces[portcount].ifindex=ifr.ifr_ifindex;
-printf("%s FOUND AX.25 PORT %d: %d %s %s STATUS: %s\n",srcbtime(0),portcount,myinterfaces[portcount].ifindex,myinterfaces[portcount].ifname,myinterfaces[portcount].asciicall,((myinterfaces[portcount].status&(IFF_UP|IFF_RUNNING))?"UP":"DOWN"));
+printf("%s FOUND AX.25 PORT: %d DEVICE: %d NAME: %s CALLSIGN: %s STATUS: %s\n",srcbtime(0),portcount,myinterfaces[portcount].ifindex,myinterfaces[portcount].ifname,myinterfaces[portcount].asciicall,((myinterfaces[portcount].status&(IFF_UP|IFF_RUNNING))?"UP":"DOWN"));
 portcount++;
 };//IF AX.25
 };//FOR INTERFACES
@@ -289,13 +300,13 @@ freeifaddrs(ifaddr);
 needreload=0;
 printf("%s DONE SCANNING INTERFACES\n",srcbtime(0));
 lastreload=time(NULL);
+expireroute(30);
 printroutes();
 if(portcount<2){printf("%s INSUFFICIENT (%d) AX.25 PORTS FOR BRIDGING\n",srcbtime(0),portcount);needreload=1;sleep(5);};//INSUFFICIENT
 };//GETINTERFACES
 
 int main(int argc,char**argv){
 ssize_t bytes;
-int po;
 
 uint8_t buf[PACKET_SIZE];
 
