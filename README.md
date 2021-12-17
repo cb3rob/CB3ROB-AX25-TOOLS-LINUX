@@ -1,4 +1,4 @@
-## CB3ROB-AX25-TOOLS-LINUX 2021-12-17T17:23:04Z (FRIDAY)
+## CB3ROB-AX25-TOOLS-LINUX 2021-12-17T17:24:58Z (FRIDAY)
 #
 ### cb3rob-kiss-tcp-attach.c
 links ax0 interface to KISS-TCP TNC, soundmodem (direwolf), or multiplexer server
@@ -12,7 +12,7 @@ AX25-over-SCTP server pretending to be a transparent radio network with AX25-SCT
 AX.25 bridge software to link all AX.25 interfaces on a linux box together and link them to one or more bpq ethernet segments transparently (or just no BPQ and link for example 2 KISS ports together)... you know... to simply have AX.25 terminal software on your laptop with wifi over bpq... and your tranceivers somewhere in the actual antenna masts. and so everything can just happily and directly talk to each other over ethernet, mainly. but it'll also bridge literally any other AX.25 interface type it finds. no digipeaters in the path. no nothing. as if it was all the same single network. kill -HUP to force re-read of interface list if new ones were added. removals are automatic.
 ### cb3rob-ax25-bridge.c
 AX.25 software switch, same functionality as cb3rob-ax25-bridge, but only sends the traffic to callsigns from which it has recently traffic a source interface, to that specific interface. not flooding other networks with your internal traffic.
-This enables you to have gigabits of AX.25 traffic on your LAN and WAN and only 'leak' some SAMB's and broadcasts to the narrowband radios or peered other networks while still allowing for fully transparant connections from and to everything on all networks
+This enables you to have gigabits of AX.25 traffic on your LAN and WAN and only 'leak' some SABM's and beacons to the narrowband radio links or peered other networks while still allowing for fully transparant connections from and to everything on all networks
 ### cb3rob-ax25-bbs.c
 #standalone AX.25 BBS
 ### cb3rob-ax25-getty.c
