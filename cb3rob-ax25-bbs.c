@@ -585,6 +585,7 @@ for(n=0;n<100;n++)dprintf(csock,"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 ssize_t cmdbget(char*name){
 int n;
 int ffd;
+int r;
 ssize_t rbytes;
 ssize_t wbytes;
 ssize_t remain;
@@ -618,7 +619,9 @@ if(sel==-1){close(ffd);close(csock);exit(EXIT_FAILURE);};
 if(sel>0)if(FD_ISSET(csock,&readfds)){
 //'STATION A SHOULD IGNORE ANY DATA NOT BEGINNING WITH #OK# OR #NO#' - AS WE ARE RUNNING ON A PTY WE CAN'T BE ABSOLUTELY SURE OF AX.25 FRAME LIMITS THOUGH.
 memset(&buf,0,sizeof(buf));
-if(recv(csock,&buf,sizeof(buf),0)>0){
+r=recv(csock,&buf,sizeof(buf),0);
+if(r==-1){close(ffd);close(csock);exit(EXIT_FAILURE);};
+if(r>0){
 for(n=0;(n<sizeof(buf)-8)&&(buf[n]!='#');n++);//FAST FORWARD TO FIRST #, ALLOW -SOME- PLAYROOM FOR EVENTUAL '\r' AT THE START (ABORT DURING SETUP) AND OTHER CREATIVE INTERPRETATIONS
 if(!bcmp(buf+n,"#NO#",4)){close(ffd);dprintf(csock,"BGET %s REFUSED BY PEER\r",name);return(-1);};
 //GP ACCEPTS #ABORT# DURING SETUP, NOT JUST MID-STREAM AS PER DOCUMENTATION TOO.
@@ -647,7 +650,9 @@ if(sel>0){
 //HANDLE ABORT -BEFORE SENDING DATA-, IGNORE ANYTHING ELSE THAT COMES IN, AS PER SPECIFICATION
 if(FD_ISSET(csock,&readfds)){
 memset(&buf,0,sizeof(buf));
-if(recv(csock,&buf,sizeof(buf),0)>0){
+r=recv(csock,&buf,sizeof(buf),0);
+if(r==-1){close(ffd);close(csock);exit(EXIT_FAILURE);};
+if(r>0){
 if(!bcmp(buf+n,"\r#ABORT#\r",9)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r",name);return(-1);};
 if(!bcmp(buf+n,"#ABORT#\r",8)){close(ffd);dprintf(csock,"BGET: %s ABORTED BY PEER\r",name);return(-1);};
 };//IF READ
