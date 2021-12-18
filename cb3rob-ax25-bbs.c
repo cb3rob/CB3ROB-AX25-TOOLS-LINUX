@@ -883,8 +883,7 @@ FD_SET(bsock,&readfds);
 tv.tv_sec=300;//ALSO BEACON TIME
 tv.tv_usec=0;
 printf("%s WAIT FOR CLIENT\n",srcbtime(0));
-sel=select(bsock+1,&readfds,NULL,NULL,&tv);
-if(sel==-1)setupsock(argv[1],argv[2]);
+select(bsock+1,&readfds,NULL,NULL,&tv);
 if(FD_ISSET(bsock,&readfds)){
 clen=sizeof(struct full_sockaddr_ax25);
 csock=accept(bsock,(struct sockaddr*)&caddr,&clen);
