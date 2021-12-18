@@ -113,6 +113,17 @@ if(ascii[n+1]==0x31)if((ascii[n+2]>=0x30)&&(ascii[n+2]<=0x35))if(ascii[n+3]==0){
 return(-1);
 };//CALLTOBIN
 
+void termclient(int csock,int master,pid_t ptychild){
+printf("%s CLIENT %d TERMINATING\n",srcbtime(0),getpid());
+memset(&tbuf,0,sizeof(tbuf));
+if(csock!=-1){printf("%s CLIENT %d CLOSING SOCKET %d\n",srcbtime(0),getpid(),csock);close(csock);csock=-1;};
+//KILL LOGIN BEFORE CLOSING MASTER
+if(ptychild!=-1){printf("%s CLIENT %d KILLING LOGIN %d\n",srcbtime(0),getpid(),ptychild);kill(ptychild,SIGTERM);sleep(10);kill(ptychild,SIGKILL);ptychild=-1;};
+if(master!=-1){printf("%s CLIENT %d CLOSING MASTER %d\n",srcbtime(0),getpid(),master);close(master);master=-1;};
+printf("%s CLIENT %d TERMINATED\n",srcbtime(0),getpid());
+exit(EXIT_SUCCESS);
+};//TERMCLIENT
+
 ssize_t sendclient(void*data,ssize_t total){
 ssize_t bytes;
 ssize_t thisblock;
@@ -129,7 +140,7 @@ tv.tv_usec=0;
 //ACTUALLY HAVE TO SELECT BEFORE WRITE. OR STUFF GOES MISSING HERE TOO. WELCOME TO LINUX
 printf("%s CLIENT %d WAIT FOR SELECT\n",srcbtime(0),getpid());
 sel=select(csock+1,NULL,&writefds,NULL,&tv);
-if(sel==-1)termclient(csock,master,ptychild);
+if(sel==-1){bytes=-1;break;};
 //FALL THROUGH IS SEND ANYWAY TO CHECK IF STILL CONNECTED
 thisblock=AX25_MTU;flags=0;if((total-sent)<=AX25_MTU){thisblock=(total-sent);flags|=MSG_EOR;};
 printf("%s CLIENT %d SENDING: %ld SENT: %ld TOTAL: %ld\n",srcbtime(0),getpid(),thisblock,sent,total);
@@ -166,17 +177,6 @@ printf("\n");
 break;
 };//WHILE NOT SOCKET LOOP
 };//SETUPSOCK
-
-void termclient(int csock,int master,pid_t ptychild){
-printf("%s CLIENT %d TERMINATING\n",srcbtime(0),getpid());
-memset(&tbuf,0,sizeof(tbuf));
-if(csock!=-1){printf("%s CLIENT %d CLOSING SOCKET %d\n",srcbtime(0),getpid(),csock);close(csock);csock=-1;};
-//KILL LOGIN BEFORE CLOSING MASTER
-if(ptychild!=-1){printf("%s CLIENT %d KILLING LOGIN %d\n",srcbtime(0),getpid(),ptychild);kill(ptychild,SIGTERM);sleep(10);kill(ptychild,SIGKILL);ptychild=-1;};
-if(master!=-1){printf("%s CLIENT %d CLOSING MASTER %d\n",srcbtime(0),getpid(),master);close(master);master=-1;};
-printf("%s CLIENT %d TERMINATED\n",srcbtime(0),getpid());
-exit(EXIT_SUCCESS);
-};//TERMCLIENT
 
 int clientcode(){
 //FORK CHILD
