@@ -206,7 +206,6 @@ return(thisrte);
 
 struct route *getroute(uint8_t*bincall){
 struct route *thisrte;
-struct route *prevrte;
 if(bincall==NULL)return(NULL);
 union{
 uint64_t tmpcall64;
