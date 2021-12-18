@@ -42,6 +42,7 @@ fd_set writefds;
 fd_set readfds;
 struct timeval tv;
 int nfds;
+int sel;
 
 char sourcecall[10];
 char destcall[10];
@@ -127,7 +128,8 @@ tv.tv_sec=60;
 tv.tv_usec=0;
 //ACTUALLY HAVE TO SELECT BEFORE WRITE. OR STUFF GOES MISSING HERE TOO. WELCOME TO LINUX
 printf("%s CLIENT %d WAIT FOR SELECT\n",srcbtime(0),getpid());
-select(csock+1,NULL,&writefds,NULL,&tv);
+sel=select(csock+1,NULL,&writefds,NULL,&tv);
+if(sel==-1)termclient(csock,master,ptychild);
 //FALL THROUGH IS SEND ANYWAY TO CHECK IF STILL CONNECTED
 thisblock=AX25_MTU;flags=0;if((total-sent)<=AX25_MTU){thisblock=(total-sent);flags|=MSG_EOR;};
 printf("%s CLIENT %d SENDING: %ld SENT: %ld TOTAL: %ld\n",srcbtime(0),getpid(),thisblock,sent,total);
@@ -237,13 +239,17 @@ FD_SET(csock,&readfds);
 tv.tv_sec=300;
 tv.tv_usec=0;
 //MAKE SURE WE CAN BOTH READ AND WRITE
-if(select(nfds+1,&readfds,NULL,NULL,&tv)>0){
+sel=select(nfds+1,&readfds,NULL,NULL,&tv);
+if(sel==-1)termclient(csock,master,ptychild);
+if(sel>0){
 //BYTES FROM PROGRAM
 FD_ZERO(&writefds);
 FD_SET(csock,&writefds);
 tv.tv_sec=0;
 tv.tv_usec=100000;
-if(select(nfds+1,NULL,&writefds,NULL,&tv)>0){
+sel=select(nfds+1,NULL,&writefds,NULL,&tv);
+if(sel==-1)termclient(csock,master,ptychild);
+if(sel>0){
 if(FD_ISSET(master,&readfds)&&FD_ISSET(csock,&writefds)){
 //STICK TO MTU SIZE - TBUF IS ONE LONGER FOR TRAILING ZERO ON STRINGS INTERNALLY
 bytes=read(master,&tbuf,sizeof(tbuf));
@@ -262,7 +268,9 @@ FD_SET(csock,&writefds);
 tv.tv_sec=0;
 tv.tv_usec=100000;
 FD_SET(master,&writefds);
-if(select(nfds+1,NULL,&writefds,NULL,&tv)>0){
+sel=select(nfds+1,NULL,&writefds,NULL,&tv);
+if(sel==-1)termclient(csock,master,ptychild);
+if(sel>0){
 if(FD_ISSET(csock,&readfds)&&FD_ISSET(master,&writefds)){
 bytes=recv(csock,&tbuf,sizeof(tbuf),0);
 if(bytes<1)termclient(csock,master,ptychild);
@@ -288,7 +296,8 @@ tv.tv_usec=0;
 //FOR EXAMPLE WHILE TYPING exit DURING A LONG ls -al OUTPUT - GIVE IT UP TO 60 SECONDS TO COMPLETE OR LET THE OTHER SIDE DISCONNECT FOR US
 while((tv.tv_sec>0)||(tv.tv_usec>0)){
 FD_SET(csock,&readfds);
-select(csock+1,&readfds,NULL,NULL,&tv);
+sel=select(csock+1,&readfds,NULL,NULL,&tv);
+if(sel==-1)break;
 if(recv(csock,&tbuf,sizeof(tbuf),0)<1)break;
 };//WAITCLIENTCLOSE
 termclient(csock,master,ptychild);
@@ -312,7 +321,8 @@ FD_SET(bsock,&readfds);
 tv.tv_sec=300;
 tv.tv_usec=0;
 printf("%s WAIT FOR CLIENT\n",srcbtime(0));
-select(bsock+1,&readfds,NULL,NULL,&tv);
+sel=select(bsock+1,&readfds,NULL,NULL,&tv);
+if(sel==-1)setupsock(argv[1],argv[2]);
 if(FD_ISSET(bsock,&readfds)){
 clen=sizeof(struct full_sockaddr_ax25);
 csock=accept(bsock,(struct sockaddr*)&caddr,&clen);
