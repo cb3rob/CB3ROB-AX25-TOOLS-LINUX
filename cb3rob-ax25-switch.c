@@ -229,11 +229,11 @@ nowtime=time(NULL);
 purgetime=nowtime-live;
 prevrte=NULL;
 delrte=NULL;
-printf("%s ROUTER DELETE PORT: %d\n",srcbtime(0),port);
+printf("%s ROUTER DELETE PORT: %d\n",srcbtime(nowtime),port);
 for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next){
 if(delrte!=NULL){memset(delrte,0,sizeof(struct route));free(delrte);delrte=NULL;};
 if((thisrte->port==port)||(thisrte->lastseen<purgetime)){
-printf("%s ROUTER PURGED ROUTE TO: %s OVER DEVICE: %d LIVETIME: %ld SECONDS\n",srcbtime(0),bincalltoascii(thisrte->bincall),thisrte->port,nowtime-thisrte->lastseen);
+printf("%s ROUTER PURGED ROUTE TO: %s OVER DEVICE: %d LIVETIME: %ld SECONDS\n",srcbtime(nowtime),bincalltoascii(thisrte->bincall),thisrte->port,nowtime-thisrte->lastseen);
 if(startrte==thisrte)startrte=thisrte->next;
 if(prevrte!=NULL)prevrte->next=thisrte->next;
 delrte=thisrte;
@@ -253,14 +253,14 @@ nowtime=time(NULL);
 purgetime=nowtime-live;
 prevrte=NULL;
 delrte=NULL;
-printf("%s ROUTER EXPIRY CHECK: %lu SECONDS\n",srcbtime(0),live);
+printf("%s ROUTER EXPIRY CHECK: %lu SECONDS\n",srcbtime(nowtime),live);
 for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next){
 if(delrte!=NULL){memset(delrte,0,sizeof(struct route));free(delrte);delrte=NULL;};
 //CHECK IF WE HAVE A myinterfaces TABLE ENTRY FOR THAT IFINDEX
 for(po=0;po<portcount;po++)if(thisrte->port==myinterfaces[po].ifindex)break;
 //IF EXPIRED OR INTERFACE IS GONE, DELETE
 if((thisrte->lastseen<purgetime)||(po==portcount)){
-printf("%s ROUTER PURGED ROUTE TO: %s OVER DEVICE: %d LIVETIME: %ld SECONDS\n",srcbtime(0),bincalltoascii(thisrte->bincall),thisrte->port,nowtime-thisrte->lastseen);
+printf("%s ROUTER PURGED ROUTE TO: %s OVER DEVICE: %d LIVETIME: %ld SECONDS\n",srcbtime(nowtime),bincalltoascii(thisrte->bincall),thisrte->port,nowtime-thisrte->lastseen);
 if(startrte==thisrte)startrte=thisrte->next;
 if(prevrte!=NULL)prevrte->next=thisrte->next;
 delrte=thisrte;

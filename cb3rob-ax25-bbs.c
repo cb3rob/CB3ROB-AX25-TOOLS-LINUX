@@ -25,7 +25,6 @@
 #include<sys/stat.h>
 #include<sys/time.h>
 #include<sys/types.h>
-#include<termios.h>
 #include<time.h>
 #include<unistd.h>
 #include<utmp.h>
@@ -52,6 +51,7 @@ struct sigaction sigact;
 socklen_t clen;
 fd_set writefds;
 fd_set readfds;
+int sel;
 
 char sourcecall[10];
 char destcall[10];
@@ -137,7 +137,8 @@ tv.tv_sec=60;
 tv.tv_usec=0;
 //ACTUALLY HAVE TO SELECT BEFORE WRITE. OR STUFF GOES MISSING HERE TOO. WELCOME TO LINUX
 printf("%s CLIENT %d WAIT FOR SELECT\n",srcbtime(0),getpid());
-select(csock+1,NULL,&writefds,NULL,&tv);
+sel=select(csock+1,NULL,&writefds,NULL,&tv);
+if(sel==-1){close(csock);exit(EXIT_FAILURE);};
 //FALL THROUGH IS SEND ANYWAY TO CHECK IF STILL CONNECTED
 thisblock=AX25_MTU;flags=0;if((total-sent)<=AX25_MTU){thisblock=(total-sent);flags|=MSG_EOR;};
 printf("%s CLIENT %d SENDING: %ld SENT: %ld TOTAL: %ld\n",srcbtime(0),getpid(),thisblock,sent,total);
@@ -612,7 +613,9 @@ tv.tv_sec=60;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
 FD_SET(csock,&readfds);
-if(select(csock+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(csock,&readfds)){
+sel=select(csock+1,&readfds,NULL,NULL,&tv);
+if(sel==-1){close(ffd);close(csock);exit(EXIT_FAILURE);};
+if(sel>0)if(FD_ISSET(csock,&readfds)){
 //'STATION A SHOULD IGNORE ANY DATA NOT BEGINNING WITH #OK# OR #NO#' - AS WE ARE RUNNING ON A PTY WE CAN'T BE ABSOLUTELY SURE OF AX.25 FRAME LIMITS THOUGH.
 memset(&buf,0,sizeof(buf));
 if(recv(csock,&buf,sizeof(buf),0)>0){
@@ -638,7 +641,9 @@ tv.tv_usec=0;
 nfds=csock;
 if(csock>nfds)nfds=csock;
 if(ffd>nfds)nfds=ffd;
-if(select(nfds+1,&readfds,NULL,NULL,&tv)>0){
+sel=select(nfds+1,&readfds,NULL,NULL,&tv);
+if(sel==-1){close(ffd);close(csock);exit(EXIT_FAILURE);};
+if(sel>0){
 //HANDLE ABORT -BEFORE SENDING DATA-, IGNORE ANYTHING ELSE THAT COMES IN, AS PER SPECIFICATION
 if(FD_ISSET(csock,&readfds)){
 memset(&buf,0,sizeof(buf));
@@ -653,14 +658,16 @@ FD_ZERO(&writefds);
 FD_SET(csock,&writefds);
 tv.tv_sec=0;
 tv.tv_usec=100000;
-if(select(csock+1,NULL,&writefds,NULL,&tv)>0)if(FD_ISSET(csock,&writefds)){
+sel=select(csock+1,NULL,&writefds,NULL,&tv);
+if(sel==-1){close(ffd);close(csock);exit(EXIT_FAILURE);};
+if(sel>0)if(FD_ISSET(csock,&writefds)){
 rbytes=read(ffd,&buf,sizeof(buf));
 if(rbytes<1){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BGET ABORTED: %s FILE READ ERROR\r",name);return(-1);};
 remain-=rbytes;
 wbytes=send(csock,&buf,rbytes,0);
 if(wbytes<rbytes){close(ffd);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BGET ABORTED: %s DATA TRANSMIT ERROR\r",name);return(-1);};
 };//FDISSET WRITE
-};//FDISSET FDD READ
+};//FDISSET FFD READ
 };//SELECT READ FILEDESCRIPTORS
 };//WHILE DATA LEFT TO SEND
 close(ffd);
@@ -746,7 +753,9 @@ tv.tv_sec=10;
 tv.tv_usec=0;
 FD_ZERO(&readfds);
 FD_SET(csock,&readfds);
-if(select(csock+1,&readfds,NULL,NULL,&tv)>0)if(FD_ISSET(csock,&readfds)){
+sel=select(csock+1,&readfds,NULL,NULL,&tv);
+if(sel==-1){close(ffd);close(csock);exit(EXIT_FAILURE);};
+if(sel>0)if(FD_ISSET(csock,&readfds)){
 memset(&buf,0,sizeof(buf));
 rbytes=recv(csock,&buf,sizeof(buf),0);
 if(rbytes<1){close(ffd);unlink(name);send(csock,"\r#ABORT#\r",9,0);dprintf(csock,"BPUT ABORTED: %s DATA RECEIVE ERROR\r",name);return(-1);};
@@ -846,7 +855,8 @@ tv.tv_usec=0;
 //FOR EXAMPLE WHILE TYPING exit DURING A LONG ls -al OUTPUT - GIVE IT UP TO 60 SECONDS TO COMPLETE OR LET THE OTHER SIDE DISCONNECT FOR US
 while((tv.tv_sec>0)||(tv.tv_usec>0)){
 FD_SET(csock,&readfds);
-select(csock+1,&readfds,NULL,NULL,&tv);
+sel=select(csock+1,&readfds,NULL,NULL,&tv);
+if(sel==-1)break;
 if(recv(csock,&tbuf,sizeof(tbuf),0)<1)break;
 };//WAITCLIENTCLOSE
 close(csock);
@@ -868,7 +878,8 @@ FD_SET(bsock,&readfds);
 tv.tv_sec=300;//ALSO BEACON TIME
 tv.tv_usec=0;
 printf("%s WAIT FOR CLIENT\n",srcbtime(0));
-select(bsock+1,&readfds,NULL,NULL,&tv);
+sel=select(bsock+1,&readfds,NULL,NULL,&tv);
+if(sel==-1)setupsock(argv[1],argv[2]);
 if(FD_ISSET(bsock,&readfds)){
 clen=sizeof(struct full_sockaddr_ax25);
 csock=accept(bsock,(struct sockaddr*)&caddr,&clen);
