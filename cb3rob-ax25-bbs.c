@@ -662,7 +662,7 @@ if(FD_ISSET(ffd,&readfds)){
 FD_ZERO(&writefds);
 FD_SET(csock,&writefds);
 tv.tv_sec=0;
-tv.tv_usec=100000;
+tv.tv_usec=500000;
 sel=select(csock+1,NULL,&writefds,NULL,&tv);
 if(sel==-1){close(ffd);close(csock);exit(EXIT_FAILURE);};
 if(sel>0)if(FD_ISSET(csock,&writefds)){
