@@ -322,11 +322,11 @@ tv.tv_sec=300;
 tv.tv_usec=0;
 printf("%s WAIT FOR CLIENT\n",srcbtime(0));
 sel=select(bsock+1,&readfds,NULL,NULL,&tv);
-if(sel==-1)setupsock(argv[1],argv[2]);
+//if(sel==-1)setupsock(argv[1],argv[2]);
 if(FD_ISSET(bsock,&readfds)){
 clen=sizeof(struct full_sockaddr_ax25);
 csock=accept(bsock,(struct sockaddr*)&caddr,&clen);
-if(csock==-1)setupsock(argv[1],argv[2]);
+//if(csock==-1)setupsock(argv[1],argv[2]);
 if(csock!=-1){if(fork()==0){close(bsock);clientcode();}else{close(csock);};};//FORK CHILD AND CLOSE CLIENTSOCK IN PARENT
 };//CLIENT IN QUEUE
 };//WHILE 1 ACCEPT

@@ -872,7 +872,6 @@ int main(int argc,char**argv){
 if(getuid()!=0){printf("THIS PROGRAM MUST RUN AS ROOT\n");exit(EXIT_FAILURE);};
 if(argc<2){printf("USAGE: %s <SERVICE-CALLSIGN-SSID> [INTERFACE-CALLSIGN]\n\nIF THE PROCESS IS TO LISTEN ON A (VIRTUAL) CALLSIGN OTHER THAN ONE OF AN INTERFACE SPECIFY THE INTERFACE AS WELL\n",argv[0]);exit(EXIT_FAILURE);};
 signal(SIGHUP,SIG_IGN);
-signal(SIGPIPE,SIG_IGN);//IGNORE OR MAIN SELECT FALLS THROUGH, CAUSES AN INVALID ACCEPT -1 AND TRIGGERS RE-SETTING UP THE MAIN SOCKET EVERY TIME A CLIENT DIES
 signal(SIGQUIT,SIG_IGN);
 signal(SIGCHLD,SIG_IGN);//PARENT DOESN'T CARE
 bsock=-1;setupsock(argv[1],argv[2]);
@@ -885,11 +884,11 @@ tv.tv_sec=300;//ALSO BEACON TIME
 tv.tv_usec=0;
 printf("%s WAIT FOR CLIENT\n",srcbtime(0));
 sel=select(bsock+1,&readfds,NULL,NULL,&tv);
-if(sel==-1)setupsock(argv[1],argv[2]);
+//if(sel==-1)setupsock(argv[1],argv[2]);
 if(FD_ISSET(bsock,&readfds)){
 clen=sizeof(struct full_sockaddr_ax25);
 csock=accept(bsock,(struct sockaddr*)&caddr,&clen);
-if(csock==-1)setupsock(argv[1],argv[2]);
+//if(csock==-1)setupsock(argv[1],argv[2]);
 if(csock!=-1){if(fork()==0){close(bsock);clientcode();}else{close(csock);};};//FORK CHILD AND CLOSE CLIENTSOCK IN PARENT
 };//CLIENT IN QUEUE
 //BEACON REQUIRES A FILLED OUT BADDR STRUCT
