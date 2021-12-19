@@ -33,17 +33,20 @@
 
 #define MAXDIGIS 7
 
-struct sockaddr_in saddr;
-struct sockaddr_in baddr;
+struct sockaddr_in6 baddr;
+struct addrinfo hint;
+struct addrinfo *hinfo;
+struct addrinfo *rp;
+char ipaddress[INET6_ADDRSTRLEN];
 struct timeval tv;
 struct hostent*he;
 int sock;
+int true;
 int tap;
 char dev[IFNAMSIZ];
 int nfds;
 struct ifreq ifr;
 int fdx;
-int encap;
 fd_set readfds;
 fd_set writefds;
 fd_set exceptfds;
@@ -221,29 +224,38 @@ if(ascii[n+1]==0x31)if((ascii[n+2]>=0x30)&&(ascii[n+2]<=0x35))if(ascii[n+3]==0){
 return(-1);
 };//CALLTOBIN
 
-void doconnect(char*host,char*port){
+void doconnect(char*host,char *port){
 //(RE-)CONNECT UDP
 if(sock!=-1)close(sock);
 sock=-1;
 while(sock==-1){
 //ALWAYS LOOK UP THE HOST AGAIN
-he=gethostbyname(host);
-if((he==NULL)||(he->h_addrtype!=AF_INET)||(he->h_length!=4)){printf("%s INVALID SERVER: %s\n",srcbtime(0),host);sleep(1);continue;};
-saddr.sin_family=AF_INET;
-bcopy(he->h_addr_list[0],&saddr.sin_addr.s_addr,sizeof(saddr.sin_addr.s_addr));
-saddr.sin_port=htons(atoi(port));
-sock=socket(PF_INET,SOCK_DGRAM,IPPROTO_UDP);
+memset(&hint,0,sizeof(struct addrinfo));
+hint.ai_flags=(AI_V4MAPPED|AI_ALL|AI_ADDRCONFIG|AI_CANONNAME);
+hint.ai_family=AF_INET6;
+hint.ai_socktype=SOCK_DGRAM;
+hint.ai_protocol=IPPROTO_UDP;
+if(getaddrinfo(host,port,&hint,&hinfo)!=0){printf("%s INVALID SERVER: %s\n",srcbtime(0),host);sleep(1);continue;};
+for(rp=hinfo;rp!=NULL;rp=rp->ai_next){
+memset(ipaddress,0,sizeof(ipaddress));
+inet_ntop(AF_INET6,&((struct sockaddr_in6*)rp->ai_addr)->sin6_addr,ipaddress,sizeof(ipaddress));
+sock=socket(rp->ai_family,rp->ai_socktype,rp->ai_protocol);
 if(sock==-1){printf("%s SOCKET SETUP ERROR\n",srcbtime(0));sleep(1);continue;};
-baddr.sin_family=AF_INET;
-baddr.sin_addr.s_addr=INADDR_ANY;
-baddr.sin_port=htons(atoi(port));
+true=1;
+setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,(char*)&true,sizeof(int));
+baddr.sin6_family=AF_INET6;
+baddr.sin6_addr=in6addr_any;
+baddr.sin6_port=((struct sockaddr_in6*)rp->ai_addr)->sin6_port;
 bind(sock,(struct sockaddr*)&baddr,sizeof(baddr));
 //ACTUALLY WE DON'T REALLY CARE IF BINDING TO THE SOURCE UDP PORT WORKED AS IT'S ONLY THERE TO CATER TO AXIPD'S NASTYNESS.
 //IF THE DESIRED SOURCEPORT=DESTINATION PORT IS TAKEN THE WORLD WILL JUST HAVE TO LIVE WITH IT BEING ANOTHER PORT AND ADAPT.
 //IT'LL BE ANOTHER PORT ONCE IT PASSES THROUGH MOST NAT ROUTERS ANYWAY. IT'S MORE OF A PREFERENCE REALLY THAN AN ACTUAL DEMAND.
-printf("%s CONNECTING: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));
-if(connect(sock,(struct sockaddr*)&saddr,sizeof(saddr))!=0){close(sock);sock=-1;printf("%s CONNECT ERROR: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));sleep(1);continue;};
-printf("%s CONNECTED: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));
+printf("%s CONNECTING: %s:%d\n",srcbtime(0),ipaddress,ntohs(((struct sockaddr_in6*)rp->ai_addr)->sin6_port));
+if(connect(sock,rp->ai_addr,rp->ai_addrlen)!=0){close(sock);sock=-1;printf("%s CONNECT ERROR: %s:%d\n",srcbtime(0),ipaddress,ntohs(((struct sockaddr_in6*)rp->ai_addr)->sin6_port));sleep(1);continue;};
+printf("%s CONNECTED: %s:%d\n",srcbtime(0),ipaddress,ntohs(((struct sockaddr_in6*)rp->ai_addr)->sin6_port));
+break;
+};
+freeaddrinfo(hinfo);
 };//WHILE SOCK -1
 };//DOCONNECT
 
