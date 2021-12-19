@@ -32,9 +32,11 @@
 
 #define MAXDIGIS 7
 
-struct sockaddr_in saddr;
 struct timeval tv;
-struct hostent*he;
+struct addrinfo hint;
+struct addrinfo *hinfo;
+struct addrinfo *rp;
+char ipaddress[INET6_ADDRSTRLEN];
 int sock;
 int tap;
 char dev[IFNAMSIZ];
@@ -133,24 +135,31 @@ if(ascii[n+1]==0x31)if((ascii[n+2]>=0x30)&&(ascii[n+2]<=0x35))if(ascii[n+3]==0){
 return(-1);
 };//CALLTOBIN
 
-void sctpconnect(char*host,char*port){
+void doconnect(char*host,char *port){
 //(RE-)CONNECT SCTP
 if(sock!=-1)close(sock);
 sock=-1;
 while(sock==-1){
 //ALWAYS LOOK UP THE HOST AGAIN
-he=gethostbyname(host);
-if((he==NULL)||(he->h_addrtype!=AF_INET)||(he->h_length!=4)){printf("%s INVALID SERVER: %s\n",srcbtime(0),host);sleep(1);continue;};
-saddr.sin_family=AF_INET;
-bcopy(he->h_addr_list[0],&saddr.sin_addr.s_addr,sizeof(saddr.sin_addr.s_addr));
-saddr.sin_port=htons(atoi(port));
-sock=socket(PF_INET,SOCK_STREAM,IPPROTO_SCTP);
+memset(&hint,0,sizeof(struct addrinfo));
+hint.ai_flags=(AI_V4MAPPED|AI_ALL|AI_ADDRCONFIG|AI_CANONNAME);
+hint.ai_family=AF_INET6;
+hint.ai_socktype=SOCK_STREAM;
+hint.ai_protocol=IPPROTO_SCTP;
+if(getaddrinfo(host,port,&hint,&hinfo)!=0){printf("%s INVALID SERVER: %s\n",srcbtime(0),host);sleep(1);continue;};
+for(rp=hinfo;rp!=NULL;rp=rp->ai_next){
+memset(ipaddress,0,sizeof(ipaddress));
+inet_ntop(AF_INET6,&((struct sockaddr_in6*)rp->ai_addr)->sin6_addr,ipaddress,sizeof(ipaddress));
+sock=socket(rp->ai_family,rp->ai_socktype,rp->ai_protocol);
 if(sock==-1){printf("%s SOCKET SETUP ERROR\n",srcbtime(0));sleep(1);continue;};
-printf("%s CONNECTING: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));
-if(connect(sock,(struct sockaddr*)&saddr,sizeof(saddr))!=0){close(sock);sock=-1;printf("%s CONNECT ERROR: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));sleep(1);continue;};
-printf("%s CONNECTED: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));
+printf("%s CONNECTING: %s:%d\n",srcbtime(0),ipaddress,ntohs(((struct sockaddr_in6*)rp->ai_addr)->sin6_port));
+if(connect(sock,rp->ai_addr,rp->ai_addrlen)!=0){close(sock);sock=-1;printf("%s CONNECT ERROR: %s:%d\n",srcbtime(0),ipaddress,ntohs(((struct sockaddr_in6*)rp->ai_addr)->sin6_port));sleep(1);continue;};
+printf("%s CONNECTED: %s:%d\n",srcbtime(0),ipaddress,ntohs(((struct sockaddr_in6*)rp->ai_addr)->sin6_port));
+break;
+};
+freeaddrinfo(hinfo);
 };//WHILE SOCK -1
-};//SCTPCONNECT
+};//DOCONNECT
 
 int main(int argc,char**argv){
 int n;
@@ -166,7 +175,7 @@ if(argc<4){printf("USAGE: %s <CALLSIGN[-SSID]> <AX25-OVER-SCTP-SERVER> <PORT>\n"
 
 if(calltobin(argv[1],&call)<1){printf("INVALID DEVICE CALLSIGN: %s\n",argv[1]);exit(EXIT_FAILURE);};
 
-sock=-1;sctpconnect(argv[2],argv[3]);
+sock=-1;doconnect(argv[2],argv[3]);
 
 tap=open("/dev/net/tun",O_RDWR);
 if(tap==-1){printf("COULD NOT CREATE TAP DEVICE PAIR\n");exit(EXIT_FAILURE);};
@@ -243,7 +252,7 @@ printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),select(nfds+1,&r
 //PACKETS THAT ARRIVE FROM AX25-OVER-SCTP SERVER
 if(FD_ISSET(sock,&readfds)){
 bytes=recv(sock,&sockpacket.payload,sizeof(sockpacket.payload),MSG_DONTWAIT);
-if(bytes<=1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);sctpconnect(argv[2],argv[3]);};
+if(bytes<=1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);doconnect(argv[2],argv[3]);};
 if(bytes>=15){//2 7 BYTE ADDRESSES, 1 CONTROL BYTE
 sockpacket.lenlsb=((bytes+5)&0x00FF);
 sockpacket.lenmsb=(((bytes+5)&0xFF00)>>8);
@@ -259,7 +268,7 @@ bytes=read(tap,&tappacket,sizeof(struct bpqethhdr));
 if(bytes>=(31)){//16 BYTE ETHBPQ HEADER + 15 BYTE AX25 PAYLOAD
 if(tappacket.ptype==ntohs(ETH_P_BPQ)){
 printf("%s OUTGOING PACKET: %ld BYTES:",srcbtime(0),bytes-16);for(n=0;n<bytes-16;n++)printf(" %02X",tappacket.payload[n]);printf("\n");
-if(send(sock,&tappacket.payload,bytes-16,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);sctpconnect(argv[2],argv[3]);};
+if(send(sock,&tappacket.payload,bytes-16,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);doconnect(argv[2],argv[3]);};
 if(checkbinpath((uint8_t*)tappacket.payload,bytes-2)){printf("%s OUTGOING PATH CHECK FAILED\n",srcbtime(0));continue;};
 }else{printf("%s TAP DEVICE IGNORED NON BPQ PROTOCOL FAMILY: %04X PACKET\n",srcbtime(0),ntohs(tappacket.ptype));};//BPQ FRAME
 };//BYTES>0
