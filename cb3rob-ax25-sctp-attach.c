@@ -142,7 +142,7 @@ sock=-1;
 while(sock==-1){
 //ALWAYS LOOK UP THE HOST AGAIN
 memset(&hint,0,sizeof(struct addrinfo));
-hint.ai_flags=(AI_V4MAPPED|AI_ALL|AI_ADDRCONFIG|AI_CANONNAME);
+hint.ai_flags=(AI_V4MAPPED|AI_ALL|AI_ADDRCONFIG);
 hint.ai_family=AF_INET6;
 hint.ai_socktype=SOCK_STREAM;
 hint.ai_protocol=IPPROTO_SCTP;
