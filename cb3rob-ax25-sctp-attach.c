@@ -45,8 +45,6 @@ struct ifreq ifr;
 int fdx;
 int encap;
 fd_set readfds;
-fd_set writefds;
-fd_set exceptfds;
 ax25_address call;
 char systemline[256];
 
@@ -227,8 +225,6 @@ printf("%s AX.25 BOUND TO DEVICE %s\n",srcbtime(0),dev);
 ssize_t bytes;
 
 FD_ZERO(&readfds);
-FD_ZERO(&writefds);
-FD_ZERO(&exceptfds);
 
 sockpacket.ethdst[0]=0xFF;
 sockpacket.ethdst[1]=0xFF;
@@ -247,7 +243,7 @@ FD_SET(sock,&readfds);
 nfds=sock;if(tap>sock)nfds=tap;
 tv.tv_sec=30;
 tv.tv_usec=0;
-printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),select(nfds+1,&readfds,&writefds,&exceptfds,&tv));
+printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),select(nfds+1,&readfds,NULL,NULL,&tv));
 
 //PACKETS THAT ARRIVE FROM AX25-OVER-SCTP SERVER
 if(FD_ISSET(sock,&readfds)){

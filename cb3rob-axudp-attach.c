@@ -39,7 +39,6 @@ struct addrinfo *hinfo;
 struct addrinfo *rp;
 char ipaddress[INET6_ADDRSTRLEN];
 struct timeval tv;
-struct hostent*he;
 int sock;
 int true;
 int tap;
@@ -48,10 +47,7 @@ int nfds;
 struct ifreq ifr;
 int fdx;
 fd_set readfds;
-fd_set writefds;
-fd_set exceptfds;
 ax25_address call;
-char systemline[256];
 
 struct bpqethhdr{
 uint8_t ethdst[6];
@@ -325,8 +321,6 @@ printf("%s AX.25 BOUND TO DEVICE %s\n",srcbtime(0),dev);
 ssize_t bytes;
 
 FD_ZERO(&readfds);
-FD_ZERO(&writefds);
-FD_ZERO(&exceptfds);
 
 sockpacket.ethdst[0]=0xFF;
 sockpacket.ethdst[1]=0xFF;
@@ -345,7 +339,7 @@ FD_SET(sock,&readfds);
 nfds=sock;if(tap>sock)nfds=tap;
 tv.tv_sec=30;
 tv.tv_usec=0;
-printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),select(nfds+1,&readfds,&writefds,&exceptfds,&tv));
+printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),select(nfds+1,&readfds,NULL,NULL,&tv));
 
 //PACKETS THAT ARRIVE FROM AXUDP SERVER
 if(FD_ISSET(sock,&readfds)){

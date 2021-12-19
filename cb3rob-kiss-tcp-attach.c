@@ -62,8 +62,6 @@ int encap;
 unsigned char pbfr[2048];
 ssize_t bytes;
 fd_set readfds;
-fd_set writefds;
-fd_set exceptfds;
 ax25_address call;
 
 char*srcbtime(time_t t){
@@ -191,8 +189,6 @@ printf("%s AX.25 BOUND TO DEVICE %s\n",srcbtime(0),dev);
 ssize_t n;
 
 FD_ZERO(&readfds);
-FD_ZERO(&writefds);
-FD_ZERO(&exceptfds);
 
 while(1){
 FD_ZERO(&readfds);
@@ -201,7 +197,7 @@ FD_SET(sock,&readfds);
 nfds=sock;if(master>sock)nfds=master;
 tv.tv_sec=30;
 tv.tv_usec=0;
-select(nfds+1,&readfds,&writefds,&exceptfds,&tv);
+select(nfds+1,&readfds,NULL,NULL,&tv);
 
 if(FD_ISSET(sock,&readfds)){
 bytes=recv(sock,&pbfr,sizeof(pbfr),MSG_DONTWAIT);
