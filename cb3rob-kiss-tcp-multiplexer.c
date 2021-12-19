@@ -31,7 +31,7 @@ struct timeval tv;
 
 int sock;
 int true;
-struct sockaddr_in saddr;
+struct sockaddr_in6 saddr;
 
 int nfds;
 int wnfds;
@@ -101,15 +101,16 @@ printf("\n");
 
 void setuplistener(){
 while(1){
-sock=socket(PF_INET,SOCK_STREAM|SOCK_NONBLOCK,IPPROTO_TCP);
+sock=socket(PF_INET6,SOCK_STREAM|SOCK_NONBLOCK,IPPROTO_TCP);
 if(sock==-1){printf("%s SOCKET CREATION FAILED\n",srcbtime(0));sleep(1);continue;};
 true=1;
 setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,(char*)&true,sizeof(int));
 true=1;
 setsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,(char*)&true,sizeof(int));
-saddr.sin_family=AF_INET;
-saddr.sin_port=htons(8001);
-saddr.sin_addr.s_addr=INADDR_ANY;
+memset(&saddr,0,sizeof(struct sockaddr_in6));
+saddr.sin6_family=AF_INET6;
+saddr.sin6_port=htons(8001);
+saddr.sin6_addr=in6addr_any;
 if(bind(sock,(struct sockaddr*)&saddr,sizeof(saddr))!=0){printf("%s SOCKET BIND FAILED\n",srcbtime(0));close(sock);sleep(1);continue;};
 if(listen(sock,MAXBACKLOG)!=0){printf("%s SOCKET LISTEN FAILED\n",srcbtime(0));close(sock);sleep(1);continue;};
 printf("%s SOCKET LISTEN SUCCESS\n",srcbtime(0));
