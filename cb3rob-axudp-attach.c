@@ -221,7 +221,7 @@ if(ascii[n+1]==0x31)if((ascii[n+2]>=0x30)&&(ascii[n+2]<=0x35))if(ascii[n+3]==0){
 return(-1);
 };//CALLTOBIN
 
-void udpconnect(char*host,char*port){
+void doconnect(char*host,char*port){
 //(RE-)CONNECT UDP
 if(sock!=-1)close(sock);
 sock=-1;
@@ -245,7 +245,7 @@ printf("%s CONNECTING: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(sadd
 if(connect(sock,(struct sockaddr*)&saddr,sizeof(saddr))!=0){close(sock);sock=-1;printf("%s CONNECT ERROR: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));sleep(1);continue;};
 printf("%s CONNECTED: %s:%d\n",srcbtime(0),inet_ntoa(saddr.sin_addr),ntohs(saddr.sin_port));
 };//WHILE SOCK -1
-};//UDPCONNECT
+};//DOCONNECT
 
 int main(int argc,char**argv){
 int n;
@@ -261,7 +261,7 @@ if(argc<4){printf("USAGE: %s <CALLSIGN[-SSID]> <AXUDP-SERVER> <PORT>\n",argv[0])
 
 if(calltobin(argv[1],&call)<1){printf("INVALID DEVICE CALLSIGN: %s\n",argv[1]);exit(EXIT_FAILURE);};
 
-sock=-1;udpconnect(argv[2],argv[3]);
+sock=-1;doconnect(argv[2],argv[3]);
 
 tap=open("/dev/net/tun",O_RDWR);
 if(tap==-1){printf("COULD NOT CREATE TAP DEVICE PAIR\n");exit(EXIT_FAILURE);};
@@ -338,7 +338,7 @@ printf("%s EXITED SELECT WITH %d FILEDESCRIPTORS\n",srcbtime(0),select(nfds+1,&r
 //PACKETS THAT ARRIVE FROM AXUDP SERVER
 if(FD_ISSET(sock,&readfds)){
 bytes=recv(sock,&sockpacket.payload,sizeof(sockpacket.payload),MSG_DONTWAIT);
-if(bytes<=1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);udpconnect(argv[2],argv[3]);};
+if(bytes<=1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);doconnect(argv[2],argv[3]);};
 if(bytes>=17){//2 7 BYTE ADDRESSES, 1 CONTROL BYTE, 2 BYTE FCS
 sockpacket.lenlsb=((bytes+5)&0x00FF);
 sockpacket.lenmsb=(((bytes+5)&0xFF00)>>8);
@@ -360,7 +360,7 @@ tappacket.payload[bytes-16]=(fcs16>>8);//FCS MSB
 tappacket.payload[bytes-15]=(fcs16&0x00FF);//FCS LSB
 printf("%s OUTGOING FCS: %04X MSB: %02X LSB: %02X %ld BYTES:",srcbtime(0),fcs16,tappacket.payload[bytes-16],tappacket.payload[bytes-15],bytes-14);for(n=0;n<bytes-14;n++)printf(" %02X",tappacket.payload[n]);printf("\n");
 if(checkbinpath((uint8_t*)tappacket.payload,bytes-16)){printf("%s OUTGOING PATH CHECK FAILED\n",srcbtime(0));continue;};
-if(send(sock,&tappacket.payload,bytes-14,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);udpconnect(argv[2],argv[3]);};
+if(send(sock,&tappacket.payload,bytes-14,MSG_DONTWAIT)<1){printf("%s DISCONNECTED\n",srcbtime(0));sleep(1);doconnect(argv[2],argv[3]);};
 }else{printf("%s TAP DEVICE IGNORED NON BPQ PROTOCOL FAMILY: %04X PACKET\n",srcbtime(0),ntohs(tappacket.ptype));};//BPQ FRAME
 };//BYTES>0
 };//FDSET
