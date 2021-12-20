@@ -512,9 +512,9 @@ total=0;
 files=0;
 dirs=0;
 fstatus=0;
-curdir=opendir(name);
+curdir=opendir(".");
 if(curdir==NULL){dprintf(csock,"ERROR OPENING DIRECTORY: %s\r",name);return(-1);};//ERROR
-dprintf(csock,"DIRECTORY OF %s\r\r",name);
+dprintf(csock,"DIRECTORY OF %s\r\r",getcwd(NULL,0));
 dprintf(csock,"./\r../\r");
 while((direntry=readdir(curdir))!=NULL){
 if((direntry->d_name[0]>=0x30&&direntry->d_name[0]<=0x39)||(direntry->d_name[0]>=0x41&&direntry->d_name[0]<=0x5A)||(direntry->d_name[0]>=0x61&&direntry->d_name[0]<=0x7A)){
