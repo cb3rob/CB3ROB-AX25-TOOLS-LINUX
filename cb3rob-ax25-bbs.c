@@ -189,13 +189,13 @@ if(beacon!=-1){
 if(bind(beacon,(struct sockaddr*)&baddr,sizeof(struct full_sockaddr_ax25))!=-1){
 memset(&beaconaddr,0,sizeof(struct full_sockaddr_ax25));
 beaconaddr.fsa_ax25.sax25_family=AF_AX25;
-beaconaddr.fsa_ax25.sax25_call.ax25_call[0]=('Q'<<1);
-beaconaddr.fsa_ax25.sax25_call.ax25_call[1]=('S'<<1);
-beaconaddr.fsa_ax25.sax25_call.ax25_call[2]=('T'<<1);
-beaconaddr.fsa_ax25.sax25_call.ax25_call[3]=(' '<<1);
-beaconaddr.fsa_ax25.sax25_call.ax25_call[4]=(' '<<1);
-beaconaddr.fsa_ax25.sax25_call.ax25_call[5]=(' '<<1);
-beaconaddr.fsa_ax25.sax25_call.ax25_call[6]=(0x00<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[0]=('N'<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[1]=('0'<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[2]=('C'<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[3]=('A'<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[4]=('L'<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[5]=('L'<<1);
+beaconaddr.fsa_ax25.sax25_call.ax25_call[6]=(0x15<<1);
 beaconaddr.fsa_ax25.sax25_ndigis=0;
 if(sendto(beacon,btext,strlen(btext),MSG_DONTWAIT,(struct sockaddr*)&beaconaddr,sizeof(struct full_sockaddr_ax25))>0)printf("%s SENT BEACON\n",srcbtime(0));
 };//IF BIND
