@@ -83,11 +83,11 @@ uint8_t bincall[8];
 };
 int port;
 time_t lastseen;
-void *next;
+void*next;
 };//STRUCT ROUTE
 
-struct route *startrte;
-struct route *findrte;
+struct route*startrte;
+struct route*findrte;
 
 struct interfaces{
 int ifindex;
@@ -155,9 +155,9 @@ for(;n<sizeof(a);n++)a[n]=0;
 return(a);
 };//BINCALLTOASCII
 
-struct route *addroute(uint8_t*bincall,int port){
-struct route *thisrte;
-struct route *prevrte;
+struct route*addroute(uint8_t*bincall,int port){
+struct route*thisrte;
+struct route*prevrte;
 if(bincall==NULL)return(NULL);
 union{
 uint64_t tmpcall64;
@@ -182,9 +182,9 @@ thisrte->port=port;
 return(thisrte);
 };//ADDROUTE
 
-struct route *delroute(uint8_t*bincall){
-struct route *thisrte;
-struct route *prevrte;
+struct route*delroute(uint8_t*bincall){
+struct route*thisrte;
+struct route*prevrte;
 if(bincall==NULL)return(NULL);
 union{
 uint64_t tmpcall64;
@@ -204,8 +204,8 @@ free(thisrte);
 return(thisrte);
 };//DELROUTE
 
-struct route *getroute(uint8_t*bincall){
-struct route *thisrte;
+struct route*getroute(uint8_t*bincall){
+struct route*thisrte;
 if(bincall==NULL)return(NULL);
 union{
 uint64_t tmpcall64;
@@ -218,10 +218,10 @@ if(thisrte!=NULL)printf("%s ROUTER FIND CALLSIGN: %s VIA DEVICE: %d\n",srcbtime(
 return(thisrte);
 };//DELROUTE
 
-struct route *delport(int port,int live){
-struct route *thisrte;
-struct route *prevrte;
-struct route *delrte;
+struct route*delport(int port,int live){
+struct route*thisrte;
+struct route*prevrte;
+struct route*delrte;
 time_t nowtime;
 time_t purgetime;
 nowtime=time(NULL);
@@ -242,10 +242,10 @@ if(delrte!=NULL){memset(delrte,0,sizeof(struct route));free(delrte);delrte=NULL;
 return(thisrte);
 };//DELROUTE
 
-struct route *expireroute(time_t live){
-struct route *thisrte;
-struct route *prevrte;
-struct route *delrte;
+struct route*expireroute(time_t live){
+struct route*thisrte;
+struct route*prevrte;
+struct route*delrte;
 time_t nowtime;
 time_t purgetime;
 nowtime=time(NULL);
@@ -272,7 +272,7 @@ return(thisrte);
 void printroutes(){
 time_t purgetime;
 purgetime=time(NULL);
-struct route *thisrte;
+struct route*thisrte;
 for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next)printf("CALLSIGN: %-12s PORT: %10d LIVETIME; %10ld SECONDS\n",bincalltoascii(thisrte->bincall),thisrte->port,purgetime-thisrte->lastseen);
 };//PRINTROUTE
 
@@ -295,7 +295,7 @@ if(ifa->ifa_addr->sa_family!=AF_PACKET)continue;
 //ONLY HAVE TO SET THE NAME ONCE
 strncpy(ifr.ifr_name,ifa->ifa_name,IFNAMSIZ-1);
 if(ioctl(sock,SIOCGIFHWADDR,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
-if(ifr.ifr_hwaddr.sa_family==AF_AX25){
+if(ifr.ifr_hwaddr.sa_family!=AF_AX25)continue;
 bcopy(ifr.ifr_hwaddr.sa_data,myinterfaces[portcount].netcall,7);
 strncpy(myinterfaces[portcount].ifname,ifr.ifr_name,sizeof(myinterfaces[portcount].ifname));
 strncpy(myinterfaces[portcount].asciicall,bincalltoascii((uint8_t*)myinterfaces[portcount].netcall),sizeof(myinterfaces[portcount].asciicall)-1);
@@ -305,7 +305,6 @@ if(ioctl(sock,SIOCGIFINDEX,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 myinterfaces[portcount].ifindex=ifr.ifr_ifindex;
 printf("%s FOUND AX.25 PORT: %d DEVICE: %d NAME: %s CALLSIGN: %s STATUS: %s\n",srcbtime(0),portcount,myinterfaces[portcount].ifindex,myinterfaces[portcount].ifname,myinterfaces[portcount].asciicall,((myinterfaces[portcount].status&(IFF_UP|IFF_RUNNING))?"UP":"DOWN"));
 portcount++;
-};//IF AX.25
 };//FOR INTERFACES
 freeifaddrs(ifaddr);
 needreload=0;

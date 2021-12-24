@@ -148,7 +148,7 @@ if(ifa->ifa_addr->sa_family!=AF_PACKET)continue;
 //ONLY HAVE TO SET THE NAME ONCE
 strncpy(ifr.ifr_name,ifa->ifa_name,IFNAMSIZ-1);
 if(ioctl(sock,SIOCGIFHWADDR,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
-if(ifr.ifr_hwaddr.sa_family==AF_AX25){
+if(ifr.ifr_hwaddr.sa_family!=AF_AX25)continue;
 bcopy(ifr.ifr_hwaddr.sa_data,myinterfaces[portcount].netcall,7);
 strncpy(myinterfaces[portcount].ifname,ifr.ifr_name,sizeof(myinterfaces[portcount].ifname));
 strncpy(myinterfaces[portcount].asciicall,bincalltoascii((uint8_t*)myinterfaces[portcount].netcall),sizeof(myinterfaces[portcount].asciicall)-1);
@@ -158,7 +158,6 @@ if(ioctl(sock,SIOCGIFINDEX,&ifr)<0){perror("IOCTL");exit(EXIT_FAILURE);};
 myinterfaces[portcount].ifindex=ifr.ifr_ifindex;
 printf("%s FOUND AX.25 PORT %d: %d %s %s STATUS: %s\n",srcbtime(0),portcount,myinterfaces[portcount].ifindex,myinterfaces[portcount].ifname,myinterfaces[portcount].asciicall,((myinterfaces[portcount].status&(IFF_UP|IFF_RUNNING))?"UP":"DOWN"));
 portcount++;
-};//IF AX.25
 };//FOR INTERFACES
 freeifaddrs(ifaddr);
 needreload=0;
