@@ -42,7 +42,6 @@ struct timeval tv;
 int sock;
 int true;
 int tap;
-char dev[IFNAMSIZ];
 int nfds;
 struct ifreq ifr;
 int fdx;
@@ -315,7 +314,7 @@ close(fdx);
 fcntl(sock,F_SETFL,fcntl(sock,F_GETFL,0)|O_NONBLOCK);
 fcntl(tap,F_SETFL,fcntl(tap,F_GETFL,0)|O_NONBLOCK);
 
-printf("%s AX.25 BOUND TO DEVICE %s\n",srcbtime(0),dev);
+printf("%s AX.25 BOUND TO DEVICE %s\n",srcbtime(0),bdev);
 
 //LOOP DATA
 ssize_t bytes;
@@ -352,7 +351,7 @@ fcs16=ntohs(compute_crc(sockpacket.payload,bytes-2));
 printf("%s INCOMING FCS: %04X MSB: %02X LSB: %02X %ld BYTES:",srcbtime(0),fcs16,sockpacket.payload[bytes-2],sockpacket.payload[bytes-1],bytes-2);for(n=0;n<bytes;n++)printf(" %02X",sockpacket.payload[n]);printf("\n");
 if((sockpacket.payload[(bytes-2)]!=(fcs16>>8))||(sockpacket.payload[(bytes-1)]!=(fcs16&0x00FF))){printf("%s INCOMING FCS FAILED\n",srcbtime(0));continue;};
 if(checkbinpath((uint8_t*)sockpacket.payload,bytes-2)){printf("%s INCOMING PATH CHECK FAILED\n",srcbtime(0));continue;};
-if(write(tap,&sockpacket,bytes+14)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
+if(write(tap,&sockpacket,bytes+14)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),bdev);
 };//BYTES>=17
 };//FDSET
 

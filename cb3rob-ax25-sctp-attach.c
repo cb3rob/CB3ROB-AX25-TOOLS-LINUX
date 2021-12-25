@@ -39,7 +39,6 @@ struct addrinfo *rp;
 char ipaddress[INET6_ADDRSTRLEN];
 int sock;
 int tap;
-char dev[IFNAMSIZ];
 int nfds;
 struct ifreq ifr;
 int fdx;
@@ -219,7 +218,7 @@ close(fdx);
 fcntl(sock,F_SETFL,fcntl(sock,F_GETFL,0)|O_NONBLOCK);
 fcntl(tap,F_SETFL,fcntl(tap,F_GETFL,0)|O_NONBLOCK);
 
-printf("%s AX.25 BOUND TO DEVICE %s\n",srcbtime(0),dev);
+printf("%s AX.25 BOUND TO DEVICE %s\n",srcbtime(0),bdev);
 
 //LOOP DATA
 ssize_t bytes;
@@ -254,7 +253,7 @@ sockpacket.lenlsb=((bytes+5)&0x00FF);
 sockpacket.lenmsb=(((bytes+5)&0xFF00)>>8);
 printf("%s INCOMING PACKET: %ld BYTES:",srcbtime(0),bytes);for(n=0;n<bytes;n++)printf(" %02X",sockpacket.payload[n]);printf("\n");
 if(checkbinpath((uint8_t*)sockpacket.payload,bytes)){printf("%s INCOMING PATH CHECK FAILED\n",srcbtime(0));continue;};
-if(write(tap,&sockpacket,bytes+16)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),dev);
+if(write(tap,&sockpacket,bytes+16)<1)printf("%s ERROR WRITING TO INTERFACE: %s\n",srcbtime(0),bdev);
 };//BYTES>=17
 };//FDSET
 
