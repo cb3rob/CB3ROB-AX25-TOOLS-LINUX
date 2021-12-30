@@ -124,6 +124,10 @@ int bincalllast(uint8_t*c){
 return(c[6]&1);
 };//BINCALLLAST
 
+int digifwd(uint8_t*c){
+return(c[6]&0x80);
+};//DIGIFWD
+
 int checkbinpath(uint8_t*c,ssize_t l){
 int n;
 if(c==NULL)return(-1);
@@ -138,6 +142,18 @@ if(checkbincall((uint8_t*)c+(n*7)))return(-1);
 if(bincalllast((uint8_t*)c+(n*7)))return(0);//DONE
 };//FOREACH DIGIPEATER
 return(-1);//MAXDIGIS RAN OUT
+};//CHECKBINPATH
+
+uint8_t *getlasthop(uint8_t*c,ssize_t l){
+int n;
+static uint8_t r;
+if(c==NULL)return(NULL);
+if(bincalllast((uint8_t*)c+7))r=(uint8_t*)c;//LASTHOP=DST,DONE
+for(n=2;n<MAXDIGIS+2;n++){
+if(digifwd((uint8_t*)c+(n*7)))r=(uint8_t*)c+(n*7);
+if(bincalllast((uint8_t*)c+(n*7)))return(r);//DONE
+};//FOREACH DIGIPEATER
+return(r);//MAXDIGIS RAN OUT PATH IS WHATEVER REPEATER WAS LAST HEARD OR THE ACTUAL DST
 };//CHECKBINPATH
 
 char*bincalltoascii(uint8_t*c){
@@ -393,7 +409,7 @@ if(checkbinpath((uint8_t*)buf+1,bytes-1))continue;
 printf("====================\n");
 printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X FROM: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),bincalltoascii((uint8_t*)buf+8));
 printf("TO: %s SIZE: %ld\n",bincalltoascii((uint8_t*)buf+1),bytes);
-addroute((uint8_t*)buf+8,ssockaddrll.sll_ifindex);//SET ROUTE TO SOURCE ADDRESS ON PORT WE HEARD IT FROM
+addroute(getlasthop((uint8_t*)buf+1,bytes-1),ssockaddrll.sll_ifindex);//SET ROUTE TO SOURCE ADDRESS ON PORT WE HEARD IT FROM
 findrte=getroute((uint8_t*)buf+1);
 if(findrte!=NULL){printf("%s FOUND SPECIFIC ROUTE TO: %s VIA DEVICE: %d\n",srcbtime(0),bincalltoascii((uint8_t*)buf+1),findrte->port);};
 dsockaddrll.sll_family=ssockaddrll.sll_family;
