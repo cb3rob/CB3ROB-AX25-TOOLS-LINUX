@@ -507,7 +507,7 @@ if(name==NULL)name=getcwd(NULL,0);
 for(n=0;name[n]==0x20;n++);
 name=name+n;//STRIP LEADING SPACE
 if(!name[0])name=getcwd(NULL,0);
-chdir(name);//NEED THIS FOR FSTAT TO WORK
+if(chdir(name)){dprintf(csock,"ERROR OPENING DIRECTORY: %s\r",name);return(-1);};//NEED THIS FOR FSTAT TO WORK
 total=0;
 files=0;
 dirs=0;
