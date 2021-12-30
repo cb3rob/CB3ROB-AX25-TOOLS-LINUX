@@ -561,7 +561,7 @@ for(n=0;name[n]==0x20;n++);
 name=name+n;//STRIP LEADING SPACE
 if(chkpath(name)==-1)dprintf(csock,"INVALID ABSOLUTE 8.3 FORMAT [A-Z 0-9] PATH: %s\r",name);
 else if(mkdir(name,00750))dprintf(csock,"CREATE DIRECTORY %s FAILED\r",name);
-else chdir(name);//WE CD INTO IT DIRECTLY
+if(chdir(name))dprintf(csock,"CREATE DIRECTORY %s FAILED\r",name);//WE CD INTO IT DIRECTLY
 dprintf(csock,"CURRENT DIRECTORY: %s\r",getcwd(NULL,0));
 };//IF PARAMETERS
 };//CMDMKDIR
