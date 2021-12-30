@@ -157,13 +157,12 @@ return(r);//MAXDIGIS RAN OUT PATH IS WHATEVER REPEATER WAS LAST HEARD OR THE ACT
 
 uint8_t *getnexthop(uint8_t*c,ssize_t l){
 int n;
-static uint8_t *r;
-if(bincalllast((uint8_t*)c+7))r=(uint8_t*)c+0;//NEXTHOP=DST,DONE
+if(bincalllast((uint8_t*)c+7))return((uint8_t*)c+0);//NEXTHOP=DST,DONE
 for(n=2;n<MAXDIGIS+2;n++){
-if(!digifwd((uint8_t*)c+(n*7)))r=(uint8_t*)c+(n*7);
-if(bincalllast((uint8_t*)c+(n*7)))return(r);//DONE
+if(!digifwd((uint8_t*)c+(n*7)))return((uint8_t*)c+(n*7));
+if(bincalllast((uint8_t*)c+(n*7)))return(NULL);//DONE
 };//FOREACH DIGIPEATER
-return(r);//MAXDIGIS RAN OUT PATH IS WHATEVER REPEATER WAS LAST HEARD OR THE ACTUAL DST
+return(NULL);//MAXDIGIS RAN OUT PATH IS WHATEVER REPEATER WAS LAST HEARD OR THE ACTUAL DST
 };//GETNEXTHOP
 
 char*bincalltoascii(uint8_t*c){
