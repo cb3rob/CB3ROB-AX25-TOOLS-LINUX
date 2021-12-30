@@ -147,8 +147,8 @@ return(-1);//MAXDIGIS RAN OUT
 uint8_t*getlasthop(uint8_t*c,ssize_t l){
 int n;
 static uint8_t *r;
-if(bincalllast((uint8_t*)c+7))r=(uint8_t*)c+7;//LASTHOP=SRC,DONE
-for(n=2;n<MAXDIGIS+2;n++){
+r=(uint8_t*)c+7;//LASTHOP=SRC
+if(!bincalllast((uint8_t*)c+7))for(n=2;n<MAXDIGIS+2;n++){
 if(digifwd((uint8_t*)c+(n*7)))r=(uint8_t*)c+(n*7);
 if(bincalllast((uint8_t*)c+(n*7)))return(r);//DONE
 };//FOREACH DIGIPEATER
