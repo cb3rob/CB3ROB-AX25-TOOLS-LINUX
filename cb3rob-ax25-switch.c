@@ -144,16 +144,21 @@ if(bincalllast((uint8_t*)c+(n*7)))return(0);//DONE
 return(-1);//MAXDIGIS RAN OUT
 };//CHECKBINPATH
 
+//WE'RE ONLY INTERESTED IN SETTING ROUTES -TO- NODES WE RECEIVED PACKETS FROM..
+//MEANING EITHER THE SOURCE ADDRESS OR THE LAST DIGIPEATER IN THE PATH THAT HAS THE FORWARDED FLAG ON
+
 uint8_t*getlasthop(uint8_t*c,ssize_t l){
 int n;
 static uint8_t *r;
-r=(uint8_t*)c+7;//LASTHOP=SRC
+r=(uint8_t*)c+7;//INITIALIZE LASTHOP=SRC
 if(!bincalllast((uint8_t*)c+7))for(n=2;n<MAXDIGIS+2;n++){
 if(digifwd((uint8_t*)c+(n*7)))r=(uint8_t*)c+(n*7);
 if(bincalllast((uint8_t*)c+(n*7)))return(r);//DONE
 };//FOREACH DIGIPEATER
 return(r);//MAXDIGIS RAN OUT PATH IS WHATEVER REPEATER WAS LAST HEARD OR THE ACTUAL DST
 };//GETLASTHOP
+
+//SAME THING, OTHER WAY AROUND... FIND (ROUTE TO) DEST CALL OR FIRST DIGIPEATER THAT DID NOT FORWARD THE FRAME
 
 uint8_t*getnexthop(uint8_t*c,ssize_t l){
 int n;
