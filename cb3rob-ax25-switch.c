@@ -158,7 +158,10 @@ return(r);//MAXDIGIS RAN OUT PATH IS WHATEVER REPEATER WAS LAST HEARD OR THE ACT
 uint8_t*getnexthop(uint8_t*c,ssize_t l){
 int n;
 if(bincalllast((uint8_t*)c+7))return((uint8_t*)c+0);//NEXTHOP=DST,DONE
-for(n=2;n<MAXDIGIS+2;n++)if((bincalllast((uint8_t*)c+(n*7)))||(!digifwd((uint8_t*)c+(n*7))))return((uint8_t*)c+(n*7));
+for(n=2;n<MAXDIGIS+2;n++){
+if(!digifwd((uint8_t*)c+(n*7)))return((uint8_t*)c+(n*7));
+if(bincalllast((uint8_t*)c+(n*7)))break;
+};
 return((uint8_t*)c+0);//MAXDIGIS RAN OUT PATH IS JUST DST... WE'LL RETURN SOMETHING TO TRY...
 };//GETNEXTHOP
 
