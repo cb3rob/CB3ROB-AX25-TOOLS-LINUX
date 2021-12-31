@@ -132,14 +132,14 @@ int checkbinpath(uint8_t*c,ssize_t l){
 int n;
 if(c==NULL)return(-1);
 if(l<15)return(-1);//SHORT PACKET
-if(checkbincall((uint8_t*)c))return(-1);
-if(bincalllast((uint8_t*)c))return(-1);
-if(checkbincall((uint8_t*)c+7))return(-1);
-if(bincalllast((uint8_t*)c+7))return(0);//DONE
+if(checkbincall(c))return(-1);
+if(bincalllast(c))return(-1);
+if(checkbincall(c+7))return(-1);
+if(bincalllast(c+7))return(0);//DONE
 for(n=2;n<MAXDIGIS+2;n++){
 if((n*7)>(l-1))return(-1);//ADDRESS+CONTROL LONGER THAN PACKET
-if(checkbincall((uint8_t*)c+(n*7)))return(-1);
-if(bincalllast((uint8_t*)c+(n*7)))return(0);//DONE
+if(checkbincall(c+(n*7)))return(-1);
+if(bincalllast(c+(n*7)))return(0);//DONE
 };//FOREACH DIGIPEATER
 return(-1);//MAXDIGIS RAN OUT
 };//CHECKBINPATH
@@ -147,27 +147,27 @@ return(-1);//MAXDIGIS RAN OUT
 //WE'RE ONLY INTERESTED IN SETTING ROUTES -TO- NODES WE RECEIVED PACKETS FROM..
 //MEANING EITHER THE SOURCE ADDRESS OR THE LAST DIGIPEATER IN THE PATH THAT HAS THE FORWARDED FLAG ON
 
-uint8_t*getlasthop(uint8_t*c,ssize_t l){
+uint8_t*getlasthop(uint8_t*c){
 int n;
 static uint8_t *r;
-r=(uint8_t*)c+7;//INITIALIZE LASTHOP=SRC
-if(!bincalllast((uint8_t*)c+7))for(n=2;n<MAXDIGIS+2;n++){
-if(digifwd((uint8_t*)c+(n*7)))r=(uint8_t*)c+(n*7);
-if(bincalllast((uint8_t*)c+(n*7)))return(r);//DONE
+r=c+7;//INITIALIZE LASTHOP=SRC
+if(!bincalllast(c+7))for(n=2;n<MAXDIGIS+2;n++){
+if(digifwd(c+(n*7)))r=c+(n*7);
+if(bincalllast(c+(n*7)))return(r);//DONE
 };//FOREACH DIGIPEATER
 return(r);//MAXDIGIS RAN OUT PATH IS WHATEVER REPEATER WAS LAST HEARD OR THE ACTUAL DST
 };//GETLASTHOP
 
 //SAME THING, OTHER WAY AROUND... FIND (ROUTE TO) DEST CALL OR FIRST DIGIPEATER THAT DID NOT FORWARD THE FRAME
 
-uint8_t*getnexthop(uint8_t*c,ssize_t l){
+uint8_t*getnexthop(uint8_t*c){
 int n;
-if(bincalllast((uint8_t*)c+7))return((uint8_t*)c+0);//NEXTHOP=DST,DONE
+if(bincalllast(c+7))return(c+0);//NEXTHOP=DST,DONE
 for(n=2;n<MAXDIGIS+2;n++){
-if(!digifwd((uint8_t*)c+(n*7)))return((uint8_t*)c+(n*7));
-if(bincalllast((uint8_t*)c+(n*7)))break;
+if(!digifwd(c+(n*7)))return(c+(n*7));
+if(bincalllast(c+(n*7)))break;
 };
-return((uint8_t*)c+0);//MAXDIGIS RAN OUT PATH IS JUST DST... WE'LL RETURN SOMETHING TO TRY...
+return(c);//MAXDIGIS RAN OUT PATH IS JUST DST... WE'LL RETURN SOMETHING TO TRY...
 };//GETNEXTHOP
 
 char*bincalltoascii(uint8_t*c){
@@ -185,6 +185,18 @@ for(;n<sizeof(a);n++)a[n]=0;
 return(a);
 };//BINCALLTOASCII
 
+void printbinpath(uint8_t*c){
+int n;
+if(c==NULL)return;
+printf("%s FROM: %s",srcbtime(0),bincalltoascii(c+7));
+if(!bincalllast(c+7))for(n=2;n<MAXDIGIS+2;n++){
+printf(" -> %s",bincalltoascii(c+(n*7)));
+if(digifwd(c+(n*7)))printf("*");
+if(bincalllast(c+(n*7)))break;
+};//FOR DIGIPEATER
+printf(" TO: %s\n",bincalltoascii(c));
+};//PRINTBINPATH
+
 struct route*addroute(uint8_t*bincall,int port){
 struct route*thisrte;
 struct route*prevrte;
@@ -196,7 +208,7 @@ uint8_t tmpcall[8];
 tmp.tmpcall64=0;
 bcopy(bincall,tmp.tmpcall,6);tmp.tmpcall[6]=bincall[6]&0x1E;
 prevrte=NULL;
-printf("%s ROUTER SET CALLSIGN: %s VIA DEVICE: %d\n",srcbtime(0),bincalltoascii((uint8_t*)bincall),port);
+printf("%s ROUTER UPDATE PATH TO: %s VIA DEVICE: %d\n",srcbtime(0),bincalltoascii(bincall),port);
 for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next)if(tmp.tmpcall64==thisrte->intcall)break;else prevrte=thisrte;
 if(thisrte==NULL){
 thisrte=malloc(sizeof(struct route));
@@ -223,7 +235,7 @@ uint8_t tmpcall[8];
 tmp.tmpcall64=0;
 bcopy(bincall,tmp.tmpcall,6);tmp.tmpcall[6]=bincall[6]&0x1E;
 prevrte=NULL;
-printf("%s ROUTER DELETE CALLSIGN: %s\n",srcbtime(0),bincalltoascii((uint8_t*)bincall));
+printf("%s ROUTER DELETE CALLSIGN: %s\n",srcbtime(0),bincalltoascii(bincall));
 for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next)if(thisrte->intcall==tmp.tmpcall64)break;else prevrte=thisrte;
 if(thisrte!=NULL){
 if(startrte==thisrte)startrte=thisrte->next;
@@ -244,7 +256,7 @@ uint8_t tmpcall[8];
 tmp.tmpcall64=0;
 bcopy(bincall,tmp.tmpcall,6);tmp.tmpcall[6]=bincall[6]&0x1E;
 for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next)if(thisrte->intcall==tmp.tmpcall64)break;
-if(thisrte!=NULL)printf("%s ROUTER FIND CALLSIGN: %s VIA DEVICE: %d\n",srcbtime(0),bincalltoascii((uint8_t*)bincall),thisrte->port);
+if(thisrte!=NULL)printf("%s ROUTER FOUND PATH TO CALLSIGN: %s VIA DEVICE: %d\n",srcbtime(0),bincalltoascii(bincall),thisrte->port);
 return(thisrte);
 };//DELROUTE
 
@@ -421,10 +433,10 @@ if(ssockaddrll.sll_family!=AF_PACKET)continue;
 if(ssockaddrll.sll_hatype!=ARPHRD_AX25)continue;
 if(checkbinpath((uint8_t*)buf+1,bytes-1))continue;
 printf("====================\n");
-printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X FROM: %s ",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),bincalltoascii((uint8_t*)buf+8));
-printf("TO: %s SIZE: %ld\n",bincalltoascii((uint8_t*)buf+1),bytes);
-addroute(getlasthop((uint8_t*)buf+1,bytes-1),ssockaddrll.sll_ifindex);//SET ROUTE TO SOURCE ADDRESS ON PORT WE HEARD IT FROM
-findrte=getroute(getnexthop(buf+1,bytes-1));
+printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X\n",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol));
+printbinpath((uint8_t*)buf+1);
+addroute(getlasthop((uint8_t*)buf+1),ssockaddrll.sll_ifindex);//SET ROUTE TO SOURCE ADDRESS ON PORT WE HEARD IT FROM
+findrte=getroute(getnexthop((uint8_t*)buf+1));
 if(findrte!=NULL){printf("%s FOUND SPECIFIC ROUTE TO: %s VIA DEVICE: %d\n",srcbtime(0),bincalltoascii((uint8_t*)buf+1),findrte->port);};
 dsockaddrll.sll_family=ssockaddrll.sll_family;
 dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
