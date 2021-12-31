@@ -450,12 +450,12 @@ for(po=0;po<portcount;po++){
 if(findrte!=NULL)if(findrte->port!=myinterfaces[po].ifindex)continue;
 //NOT BRIDGING TO SOURCE INTERFACE
 if(myinterfaces[po].ifindex==ssockaddrll.sll_ifindex){
-printf("%s NOT RETURNING PACKET OVER INPUT DEVICE: %d (%s) HOP %s\n",srcbtime(0),myinterfaces[po].ifindex,myinterfaces[po].ifname,nexthopascii);
+printf("%s NOT RETURNING PACKET OVER INPUT DEVICE: %d (%s) %s: %s\n",srcbtime(0),myinterfaces[po].ifindex,myinterfaces[po].ifname,nexthopbin==(buf+1)?"TO":"VIA",nexthopascii);
 continue;};
 //NOT BRIDGING TO INTERFACES THAT ARE NOT UP
 if(!(myinterfaces[po].status&(IFF_UP|IFF_RUNNING))){needreload=1;continue;};
 //ALL FINE, FORWARD PACKET
-printf("%s FORWARDING PACKET OVER DEVICE: %d (%s) HOP: %s\n",srcbtime(0),myinterfaces[po].ifindex,myinterfaces[po].ifname,nexthopascii);
+printf("%s FORWARDING PACKET OVER DEVICE: %d (%s) %s: %s\n",srcbtime(0),myinterfaces[po].ifindex,myinterfaces[po].ifname,nexthopbin==(buf+1)?"TO":"VIA",nexthopascii);
 dsockaddrll.sll_ifindex=myinterfaces[po].ifindex;
 if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,sizeof(struct sockaddr_ll))==-1){perror("SENDTO");delport(dsockaddrll.sll_ifindex,ROUTEEXPIRY);needreload=1;continue;};
 };//FOR FORWARD PACKET TO EACH INTERFACE THAT WAS UP AT PROGRAM START IT DID NOT ORIGINATE FROM
