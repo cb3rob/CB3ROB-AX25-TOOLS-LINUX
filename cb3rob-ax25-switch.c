@@ -436,7 +436,7 @@ if(ssockaddrll.sll_family!=AF_PACKET)continue;
 if(ssockaddrll.sll_hatype!=ARPHRD_AX25)continue;
 if(checkbinpath((uint8_t*)buf+1,bytes-1))continue;
 printf("====================\n");
-printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X\n",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol));
+printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X LENGTH: %ld\n",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol),bytes-1);
 printbinpath((uint8_t*)buf+1);
 addroute(getlasthop((uint8_t*)buf+1),ssockaddrll.sll_ifindex);//SET ROUTE TO SOURCE ADDRESS ON PORT WE HEARD IT FROM
 nexthopbin=getnexthop((uint8_t*)buf+1);
