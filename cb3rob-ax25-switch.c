@@ -362,6 +362,9 @@ ssize_t bytes;
 
 uint8_t buf[PACKET_SIZE];
 
+uint8_t*nexthopbin;
+char*nexthopascii;
+
 fd_set readfds;
 struct timeval tv;
 
@@ -436,8 +439,9 @@ printf("====================\n");
 printf("%s INPUT DEVICE: %d FAMILY: %04X PROTOCOL: %04X\n",srcbtime(0),ssockaddrll.sll_ifindex,ssockaddrll.sll_hatype,ntohs(ssockaddrll.sll_protocol));
 printbinpath((uint8_t*)buf+1);
 addroute(getlasthop((uint8_t*)buf+1),ssockaddrll.sll_ifindex);//SET ROUTE TO SOURCE ADDRESS ON PORT WE HEARD IT FROM
-findrte=getroute(getnexthop((uint8_t*)buf+1));
-if(findrte!=NULL){printf("%s FOUND SPECIFIC ROUTE TO: %s VIA DEVICE: %d\n",srcbtime(0),bincalltoascii((uint8_t*)buf+1),findrte->port);};
+nexthopbin=getnexthop((uint8_t*)buf+1);
+findrte=getroute(nexthopbin);
+nexthopascii=bincalltoascii(nexthopbin);
 dsockaddrll.sll_family=ssockaddrll.sll_family;
 dsockaddrll.sll_protocol=ssockaddrll.sll_protocol;
 dsockaddrll.sll_hatype=ssockaddrll.sll_hatype;
@@ -446,12 +450,12 @@ for(po=0;po<portcount;po++){
 if(findrte!=NULL)if(findrte->port!=myinterfaces[po].ifindex)continue;
 //NOT BRIDGING TO SOURCE INTERFACE
 if(myinterfaces[po].ifindex==ssockaddrll.sll_ifindex){
-printf("%s NOT RETURNING PACKET OVER INPUT DEVICE: %d (%s) TO %s\n",srcbtime(0),myinterfaces[po].ifindex,myinterfaces[po].ifname,bincalltoascii((uint8_t*)buf+1));
+printf("%s NOT RETURNING PACKET OVER INPUT DEVICE: %d (%s) HOP %s\n",srcbtime(0),myinterfaces[po].ifindex,myinterfaces[po].ifname,nexthopascii);
 continue;};
 //NOT BRIDGING TO INTERFACES THAT ARE NOT UP
 if(!(myinterfaces[po].status&(IFF_UP|IFF_RUNNING))){needreload=1;continue;};
 //ALL FINE, FORWARD PACKET
-printf("%s FORWARDING PACKET OVER DEVICE: %d (%s) TO: %s\n",srcbtime(0),myinterfaces[po].ifindex,myinterfaces[po].ifname,bincalltoascii((uint8_t*)buf+1));
+printf("%s FORWARDING PACKET OVER DEVICE: %d (%s) HOP: %s\n",srcbtime(0),myinterfaces[po].ifindex,myinterfaces[po].ifname,nexthopascii);
 dsockaddrll.sll_ifindex=myinterfaces[po].ifindex;
 if(sendto(sock,&buf,bytes,0,(struct sockaddr*)&dsockaddrll,sizeof(struct sockaddr_ll))==-1){perror("SENDTO");delport(dsockaddrll.sll_ifindex,ROUTEEXPIRY);needreload=1;continue;};
 };//FOR FORWARD PACKET TO EACH INTERFACE THAT WAS UP AT PROGRAM START IT DID NOT ORIGINATE FROM
