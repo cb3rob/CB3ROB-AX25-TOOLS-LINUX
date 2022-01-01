@@ -274,7 +274,7 @@ printf("%s ROUTER DELETE PORT: %d\n",srcbtime(nowtime),port);
 for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next){
 if(delrte!=NULL){memset(delrte,0,sizeof(struct route));free(delrte);delrte=NULL;};
 if((thisrte->port==port)||(thisrte->lastseen<purgetime)){
-printf("%s ROUTER PURGED ROUTE TO: %s OVER DEVICE: %d LIVETIME: %ld SECONDS\n",srcbtime(nowtime),bincalltoascii(thisrte->bincall),thisrte->port,nowtime-thisrte->lastseen);
+printf("%s ROUTER PURGED ROUTE TO: %s OVER DEVICE: %d AGE: %ld SECONDS\n",srcbtime(nowtime),bincalltoascii(thisrte->bincall),thisrte->port,nowtime-thisrte->lastseen);
 if(startrte==thisrte)startrte=thisrte->next;
 if(prevrte!=NULL)prevrte->next=thisrte->next;
 delrte=thisrte;
@@ -301,7 +301,7 @@ if(delrte!=NULL){memset(delrte,0,sizeof(struct route));free(delrte);delrte=NULL;
 for(po=0;po<portcount;po++)if(thisrte->port==myinterfaces[po].ifindex)break;
 //IF EXPIRED OR INTERFACE IS GONE, DELETE
 if((thisrte->lastseen<purgetime)||(po==portcount)){
-printf("%s ROUTER PURGED ROUTE TO: %s OVER DEVICE: %d LIVETIME: %ld SECONDS\n",srcbtime(nowtime),bincalltoascii(thisrte->bincall),thisrte->port,nowtime-thisrte->lastseen);
+printf("%s ROUTER PURGED ROUTE TO: %s OVER DEVICE: %d AGE: %ld SECONDS\n",srcbtime(nowtime),bincalltoascii(thisrte->bincall),thisrte->port,nowtime-thisrte->lastseen);
 if(startrte==thisrte)startrte=thisrte->next;
 if(prevrte!=NULL)prevrte->next=thisrte->next;
 delrte=thisrte;
@@ -315,7 +315,7 @@ void printroutes(){
 time_t purgetime;
 purgetime=time(NULL);
 struct route*thisrte;
-for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next)printf("CALLSIGN: %-12s PORT: %10d LIVETIME; %10ld SECONDS\n",bincalltoascii(thisrte->bincall),thisrte->port,purgetime-thisrte->lastseen);
+for(thisrte=startrte;thisrte!=NULL;thisrte=thisrte->next)printf("CALLSIGN: %-12s PORT: %10d AGE: %10ld SECONDS\n",bincalltoascii(thisrte->bincall),thisrte->port,purgetime-thisrte->lastseen);
 };//PRINTROUTE
 
 //SIGNALHANDLER HUP
