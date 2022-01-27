@@ -16,7 +16,7 @@
 
 //TO BRING UP AN AX.25 KISS INTERFACE (ax0,ax1,etc) TO A KISS TNC OR KISS CONCENTRATOR SERVER:
 
-// ./cb3rob-kiss-tcp-attach NOCALL 208.109.9.123 8001 &
+// ./cb3rob-kiss-tcp-attach NOCALL kisstcp.cb3rob.tech 8001 &
 
 #include<arpa/inet.h>
 #include<fcntl.h>

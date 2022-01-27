@@ -688,7 +688,7 @@ for(n=0;name[n]==0x20;n++);
 name=name+n;//STRIP LEADING SPACE
 if(!name[0])return(-1);
 r=readfile(name,BPNLCR);
-if(r>=0)dprintf(csock,"\rREAD COMPLETED: %s BYTES: %ld\r",name,readfile(name,BPNLCR));else dprintf(csock,"ERROR OPENING: %s\r",name);
+if(r>=0)dprintf(csock,"\rREAD COMPLETED: %s BYTES: %ld\r",name,r);else dprintf(csock,"ERROR OPENING: %s\r",name);
 return(r);
 };//CMDCHDIR
 
